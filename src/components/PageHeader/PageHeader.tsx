@@ -23,22 +23,32 @@ const PageHeader: FC<PageHeaderProps> = () => {
    useEffect(() => {
       const handleLoginUpdate = () => {
          const token = localStorage.getItem("token");
-
-         // if (token) {
-         //    const decoded: any = jwtDecode(token);
-         //    const username = decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"];
-
-         //    setNickname(username);
-         // }
+   
+         if (token) {
+            try {
+               const decoded: any = jwtDecode(token);
+               const username = decoded.sub;
+               
+               if (username) {
+                  setNickname(username);
+               }
+            } catch (error) {
+               console.error("Error decoding token: ", error);
+            }
+         }
       };
-
+   
       handleLoginUpdate();
-
       window.addEventListener("loggedIn", handleLoginUpdate);
+   
+      return () => {
+         window.removeEventListener("loggedIn", handleLoginUpdate);
+      };
    }, []);
 
    const handleLogOut = () => {
       localStorage.removeItem("token");
+      window.dispatchEvent(new Event("loggedOut"));
       setNickname(null);
       navigate('/');
    };
