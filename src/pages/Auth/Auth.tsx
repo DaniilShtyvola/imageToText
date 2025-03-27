@@ -1,7 +1,7 @@
 import React, { FC, useState, useEffect } from 'react';
-import { 
-   PageWrapper, 
-   PageContainer 
+import {
+   PageWrapper,
+   PageContainer
 } from '../Page.styled.ts';
 import "./Auth.css";
 
@@ -19,21 +19,27 @@ const AuthPage: FC = () => {
    const [message, setMessage] = useState<{ text: string, variant: string } | null>(null);
    const [isFadingOut, setIsFadingOut] = useState(false);
 
+   const API_URL = import.meta.env.VITE_API_URL;
+
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      const API_URL = import.meta.env.VITE_API_URL;
 
       try {
          if (isLogin) {
-            const response = await axios.post(`${API_URL}/Auth/login`, { email, password }, {
-               headers: { 'Content-Type': 'application/json' }
+            const formData = new URLSearchParams();
+            formData.append("username", username);
+            formData.append("password", password);
+
+            const response = await axios.post(`${API_URL}/token`, formData, {
+               headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
 
-            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('token', response.data.access_token);
             setMessage({ text: "Login successful!", variant: "success" });
             window.dispatchEvent(new Event("loggedIn"));
          } else {
-            await axios.post(`${API_URL}/Auth/register-user`, { userName: username, email, password });
+            await axios.post(`${API_URL}/register`, { name: username, password });
+
             setMessage({ text: "Successfully registered!", variant: "success" });
             setIsLogin(true);
          }
@@ -63,32 +69,32 @@ const AuthPage: FC = () => {
 
    return (
       <PageWrapper>
-         <PageContainer style={{ display: "flex", justifyContent: "center" }}>
+         <PageContainer>
             <Form onSubmit={handleSubmit} style={{ width: "300px" }}>
+               <Form.Group controlId="formUsername" className="mb-3">
+                  <Form.Control
+                     className='FormPlaceholder'
+                     style={{ backgroundColor: "rgb(33, 37, 41)", color: "white", border: "none" }}
+                     type="text"
+                     placeholder="Enter username"
+                     value={username}
+                     onChange={(e) => setUsername(e.target.value)}
+                     required
+                  />
+               </Form.Group>
                {!isLogin && (
-                  <Form.Group controlId="formUsername" className="mb-3">
+                  <Form.Group controlId="formEmail" className="mb-3">
                      <Form.Control
                         className='FormPlaceholder'
                         style={{ backgroundColor: "rgb(33, 37, 41)", color: "white", border: "none" }}
-                        type="text"
-                        placeholder="Enter username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        type="email"
+                        placeholder="Enter email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                      />
                   </Form.Group>
                )}
-               <Form.Group controlId="formEmail" className="mb-3">
-                  <Form.Control
-                     className='FormPlaceholder'
-                     style={{ backgroundColor: "rgb(33, 37, 41)", color: "white", border: "none" }}
-                     type="email"
-                     placeholder="Enter email"
-                     value={email}
-                     onChange={(e) => setEmail(e.target.value)}
-                     required
-                  />
-               </Form.Group>
                <Form.Group controlId="formPassword" className="mb-3">
                   <Form.Control
                      className='FormPlaceholder'

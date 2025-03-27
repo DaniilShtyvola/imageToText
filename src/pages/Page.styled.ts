@@ -12,4 +12,6 @@ min-height: 92vh;
 export const PageContainer = styled.div`
 width: 1120px;
 margin-top: 24px;
+display: flex;
+justify-content: center;
 `;
