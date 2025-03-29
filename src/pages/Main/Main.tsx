@@ -8,7 +8,7 @@ import { Spinner, Button, Image, Alert } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFaceFrown, faShareFromSquare, faComment } from '@fortawesome/free-solid-svg-icons';
+import { faFaceFrown, faShareFromSquare, faComment, faQuestion } from '@fortawesome/free-solid-svg-icons';
 
 const Main: FC = () => {
    const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -56,35 +56,22 @@ const Main: FC = () => {
       }
    };
 
-   const checkSubscription = async (token: string): Promise<boolean> => {
+   const checkSubscription = async (username: string): Promise<boolean> => {
       try {
-         const response = await fetch(`${API_URL}/users/subscription_status`, {
+         const response = await fetch(`${ API_URL }/subscription_status/${ username }`, {
             method: 'GET',
-            headers: {
-               'Authorization': `Bearer ${token}`,
-               'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' }
          });
 
-         // Проверка на успешный ответ
          if (!response.ok) {
-            console.error(`HTTP error! Status: ${response.status}`);
-            // Логируем текст ошибки для дальнейшего анализа
-            const errorText = await response.text();
-            console.error('Error response body:', errorText);
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            throw new Error(`HTTP error! status: ${ response.status }`);
          }
 
-         // Пробуем распарсить ответ как JSON
          const data = await response.json();
-
-         // Проверяем полученные данные
-         console.log('Subscription status:', data);
-
-         return data.subscription_status === 'active'; // или другой статус, если в ответе строка "active"
+         return data.subscription_status === "active";
       } catch (error) {
-         console.error('Error checking subscription:', error);
-         return false; // Вернем false, если произошла ошибка
+         console.error("Error checking subscription:", error);
+         return false;
       }
    };
 
@@ -101,11 +88,12 @@ const Main: FC = () => {
       setErrorMessage(null);
 
       const isSubscribed = await checkSubscription(token);
-      if (!isSubscribed) {
-         setLoading(false);
-         setErrorMessage("Your subscription is inactive. Please renew it to use this feature.");
-         return;
-      }
+      // if (!isSubscribed) {
+      //    setLoading(false);
+      //    setErrorMessage("Your subscription is inactive. Please renew it to use this feature.");
+      //    return;
+      // }
+      return;
 
       try {
          const AI_API_URL = import.meta.env.VITE_AI_API_URL;
@@ -196,23 +184,24 @@ const Main: FC = () => {
                      )}
                   </div>
                   {loading ? (
-                     <div className="d-flex justify-content-center align-items-center" style={{ height: "400px" }}>
+                     <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
                         <Spinner animation="border" style={{ color: "white" }} />
                      </div>
                   ) : (
                      <>
                         {ocrResult ? (
                            <div>
-                              <p style={{ color: "rgba(255, 255, 255, 0.55)", margin: "1rem" }}>Found text:</p>
+                              {ocrResult != "Текст не обнаружен на изображении" && <p style={{ color: "rgba(255, 255, 255, 0.55)", margin: "1rem 0 0 1rem" }}>Found text:</p>}
                               <div style={{
                                  display: "flex",
                                  color: "white",
                                  width: "400px",
                                  border: "1px solid rgb(33, 37, 41)",
-                                 padding: "1rem"
+                                 padding: "1rem",
+                                 marginTop: "1rem"
                               }}>
                                  <FontAwesomeIcon
-                                    icon={faComment}
+                                    icon={ocrResult == "Текст не обнаружен на изображении" ? faQuestion : faComment}
                                     style={{
                                        marginRight: "6px",
                                        color: "rgba(255, 255, 255, 0.55)",
