@@ -19,31 +19,33 @@ const AuthPage: FC = () => {
    const [message, setMessage] = useState<{ text: string, variant: string } | null>(null);
    const [isFadingOut, setIsFadingOut] = useState(false);
 
-   const API_URL = import.meta.env.VITE_API_URL;
+   const API_URL = "http://127.0.0.1:8000";
 
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-
+   
       try {
          if (isLogin) {
             const formData = new URLSearchParams();
             formData.append("username", username);
             formData.append("password", password);
-
+   
             const response = await axios.post(`${API_URL}/token`, formData, {
                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
-
+   
             localStorage.setItem('token', response.data.access_token);
+            localStorage.setItem('username', username);  
+   
             setMessage({ text: "Login successful!", variant: "success" });
             window.dispatchEvent(new Event("loggedIn"));
          } else {
             await axios.post(`${API_URL}/register`, { name: username, password });
-
+   
             setMessage({ text: "Successfully registered!", variant: "success" });
             setIsLogin(true);
          }
-
+   
          setEmail("");
          setPassword("");
          setUsername("");
@@ -52,7 +54,7 @@ const AuthPage: FC = () => {
          console.error("Error:", error);
       }
    };
-
+   
    useEffect(() => {
       if (message) {
          const fadeOutTimer = setTimeout(() => setIsFadingOut(true), 3000);
