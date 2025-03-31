@@ -19,10 +19,10 @@ const AuthPage: FC = () => {
    } | null>(null);
    const [isFadingOut, setIsFadingOut] = useState(false);
 
-   const API_URL = "http://127.0.0.1:8000";
-
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+
+      const API_URL = import.meta.env.VITE_API_URL;
 
       try {
          if (isLogin) {

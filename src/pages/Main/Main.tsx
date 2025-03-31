@@ -10,7 +10,7 @@ import { faFaceFrown, faShareFromSquare, faComment, faQuestion } from "@fortawes
 const Main: FC = () => {
    const fileInputRef = useRef<HTMLInputElement | null>(null);
    const [loading, setLoading] = useState(false);
-   const [isLoggedIn, setIsLoggedIn] = useState(true);
+   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
    const [image, setImage] = useState<string | null>(null);
    const [ocrResult, setOcrResult] = useState<string | null>(null);
@@ -101,9 +101,10 @@ const Main: FC = () => {
          const AI_API_URL = import.meta.env.VITE_AI_API_URL;
          const base64Image = image.split(",")[1];
 
-         console.log("Send image to:", AI_API_URL);
+         const fullUrl = `${AI_API_URL}/ocr/base64/detailed`
+         console.log("Send image to:", fullUrl);
 
-         const response = await fetch(`${AI_API_URL}/ocr/base64`, {
+         const response = await fetch(fullUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ base64_image: base64Image }),
@@ -115,9 +116,10 @@ const Main: FC = () => {
          if (!response.ok) throw new Error(`Error AI API: ${response.status}`);
 
          const data = JSON.parse(text);
-         setOcrResult(data.text);
+         setOcrResult(data.full_text);
       } catch (error) {
          console.error("Error sending image:", error);
+         setOcrResult("");
       } finally {
          setLoading(false);
       }
