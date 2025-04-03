@@ -13,11 +13,23 @@ import uuid
 import tempfile
 import os
 import shutil
+import asyncio
+import logging
 from typing import Optional, List, Dict, Any
+from telegram import Update, Bot
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+TELEGRAM_BOT_TOKEN = "8061847198:AAHGZkfa06iQ1R16TnimfgKFT7Po0HkCu9Q" 
 
 app = FastAPI(
-    title="OCR API",
-    description="API для распознавания текста из изображений с помощью EasyOCR",
+    title="OCR API with Telegram Bot",
+    description="API для распознавания текста из изображений с помощью EasyOCR и Telegram бота",
     version="1.0.0",
     contact={
         "name": "OCR API Support",
@@ -37,7 +49,6 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Initialize EasyOCR reader with Russian and English languages
 reader = easyocr.Reader(['ru', 'en'])
 
 class Base64Image(BaseModel):
@@ -81,6 +92,128 @@ class OCRDetailedResult(BaseModel):
                 ]
             }
         }
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info(f"User {user.id} ({user.first_name}) started the bot")
+    
+    try:
+        await update.message.reply_text(
+            f"Привет, {user.first_name}! 👋\n\n"
+            "Я OCR бот для распознавания текста с изображений.\n"
+            "Отправь мне фотографию с текстом, и я извлеку из неё текст.\n\n"
+            "Поддерживаются русский и английский языки."
+        )
+        logger.info(f"Sent welcome message to user {user.id}")
+    except Exception as e:
+        logger.error(f"Error sending start message: {str(e)}")
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info(f"User {user.id} requested help")
+    
+    try:
+        await update.message.reply_text(
+            "🔍 *Распознавание текста с изображений*\n\n"
+            "Просто отправь мне фото с текстом, и я верну распознанный текст.\n"
+            "Поддерживаются русский и английский языки.\n\n"
+            "Советы для лучшего распознавания:\n"
+            "• Убедитесь, что текст хорошо освещен\n"
+            "• Избегайте сильных теней на тексте\n"
+            "• Фотографируйте текст прямо, без наклона\n"
+            "• Для документов лучше использовать режим «Документ» в камере",
+            parse_mode="Markdown"
+        )
+        logger.info(f"Sent help message to user {user.id}")
+    except Exception as e:
+        logger.error(f"Error sending help message: {str(e)}")
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error(f"Exception while handling an update: {context.error}")
+    
+    import traceback
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    logger.error(f"Exception traceback:\n{tb_string}")
+
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    photo = update.message.photo[-1]
+    
+    processing_message = await update.message.reply_text("Обрабатываю изображение...")
+
+    try:
+        photo_file = await context.bot.get_file(photo.file_id)
+        
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}.jpg")
+        
+        await photo_file.download_to_drive(temp_file_path)
+        
+        text_list, full_text, details = process_image_detailed(temp_file_path)
+        
+        if text_list:
+            response_text = f"Распознанный текст:\n\n{full_text}"
+        else:
+            response_text = "Не удалось распознать текст на изображении."
+        
+        await update.message.reply_text(response_text)
+        
+        await processing_message.delete()
+        
+    except Exception as e:
+        logger.error(f"Error processing Telegram photo: {str(e)}")
+        await update.message.reply_text(f"Произошла ошибка при обработке изображения: {str(e)}")
+        await processing_message.delete()
+    
+    finally:
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            os.rmdir(temp_dir)
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    processing_message = await update.message.reply_text("Обрабатываю документ...")
+    
+    try:
+        doc_file = await context.bot.get_file(update.message.document.file_id)
+        
+        file_name = update.message.document.file_name
+        if not file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+            await update.message.reply_text("Пожалуйста, отправьте изображение в формате PNG, JPG, JPEG, BMP или TIFF.")
+            await processing_message.delete()
+            return
+        
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}{os.path.splitext(file_name)[1]}")
+        
+        await doc_file.download_to_drive(temp_file_path)
+        
+        text_list, full_text, details = process_image_detailed(temp_file_path)
+        
+        if text_list:
+            response_text = f"Распознанный текст:\n\n{full_text}"
+        else:
+            response_text = "Не удалось распознать текст на изображении."
+        
+        await update.message.reply_text(response_text)
+        
+        await processing_message.delete()
+        
+    except Exception as e:
+        logger.error(f"Error processing Telegram document: {str(e)}")
+        await update.message.reply_text(f"Произошла ошибка при обработке документа: {str(e)}")
+        await processing_message.delete()
+    
+    finally:
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            os.rmdir(temp_dir)
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "Отправьте мне изображение с текстом, и я распознаю его для вас."
+    )
 
 @app.post(
     "/ocr/file", 
@@ -178,23 +311,19 @@ async def ocr_from_base64(image_data: Base64Image):
     response_description="Возвращает расширенную информацию о распознанном тексте с форматированием",
     tags=["OCR"]
 )
-@app.options("/ocr/base64/detailed")  # Handle OPTIONS preflight request
+@app.options("/ocr/base64/detailed")
 async def ocr_from_base64_detailed(image_data: Base64Image):
-    # Add debug logging
     print(f"Received base64 request with filename: {image_data.filename}")
     
     temp_dir = tempfile.mkdtemp()
     temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}.png")
     
     try:
-        # Safely decode base64 data with error handling
         try:
-            # Strip potential prefixes like "data:image/jpeg;base64,"
             base64_str = image_data.base64_image
             if "," in base64_str:
                 base64_str = base64_str.split(",", 1)[1]
             
-            # Add padding if needed
             padding = len(base64_str) % 4
             if padding:
                 base64_str += "=" * (4 - padding)
@@ -208,11 +337,9 @@ async def ocr_from_base64_detailed(image_data: Base64Image):
                 detail=f"Invalid base64 data: {str(decode_error)}"
             )
         
-        # Write to file
         with open(temp_file_path, "wb") as file:
             file.write(img_data)
         
-        # Verify file was written correctly
         if not os.path.exists(temp_file_path) or os.path.getsize(temp_file_path) == 0:
             raise HTTPException(
                 status_code=500,
@@ -221,17 +348,14 @@ async def ocr_from_base64_detailed(image_data: Base64Image):
             
         print(f"Image saved to temporary file: {temp_file_path}")
         
-        # Process the image
         text_list, full_text, details = process_image_detailed(temp_file_path)
         
-        # Convert all data to JSON-serializable Python types
         response_data = convert_numpy_types({
             "text": text_list, 
             "full_text": full_text, 
             "details": details
         })
         
-        # Use a custom JSON encoder to handle any remaining NumPy types
         return JSONResponse(
             content=response_data,
             headers={
@@ -243,17 +367,14 @@ async def ocr_from_base64_detailed(image_data: Base64Image):
         )
     
     except HTTPException as he:
-        # Re-raise HTTP exceptions
         raise he
     except Exception as e:
-        # Log the full exception for debugging
         import traceback
         error_trace = traceback.format_exc()
         print(f"Error processing image: {str(e)}\n{error_trace}")
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
     
     finally:
-        # Clean up temporary files
         try:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
@@ -263,9 +384,6 @@ async def ocr_from_base64_detailed(image_data: Base64Image):
             print(f"Error during cleanup: {str(cleanup_error)}")
 
 def process_image(image_path):
-    """
-    Обрабатывает изображение и возвращает список распознанных текстовых строк.
-    """
     image = cv2.imread(image_path)
     if image is None:
         raise HTTPException(
@@ -274,25 +392,19 @@ def process_image(image_path):
         )
     
     try:
-        # Применяем предобработку изображения для улучшения распознавания
         preprocessed_image = preprocess_image(image)
         
-        # Распознаем текст
         results = reader.readtext(preprocessed_image)
         
-        # Отфильтровываем результаты с низкой уверенностью
         filtered_results = [result for result in results if result[2] > 0.2]
         
         if not filtered_results:
             return ["Текст не обнаружен на изображении"]
         
-        # Извлекаем текст из результатов
         text_results = [result[1] for result in filtered_results]
         
-        # Очищаем текст
         cleaned_results = [clean_text(text) for text in text_results]
         
-        # Удаляем пустые строки
         final_results = [text for text in cleaned_results if text.strip()]
         
         return final_results
@@ -303,11 +415,7 @@ def process_image(image_path):
             detail=f"Ошибка распознавания текста: {str(e)}"
         )
 
-# Add a helper function to convert NumPy types to Python native types
 def convert_numpy_types(obj):
-    """
-    Recursively converts NumPy types to Python native types to make them JSON serializable.
-    """
     if isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
@@ -323,7 +431,6 @@ def convert_numpy_types(obj):
     else:
         return obj
 
-# Custom JSON encoder that handles NumPy types
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -335,10 +442,6 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def process_image_detailed(image_path):
-    """
-    Обрабатывает изображение и возвращает детальную информацию о распознанном тексте
-    с сохранением структуры и форматирования.
-    """
     image = cv2.imread(image_path)
     if image is None:
         raise HTTPException(
@@ -347,47 +450,37 @@ def process_image_detailed(image_path):
         )
     
     try:
-        # Предобработка изображения
         preprocessed_image = preprocess_image(image)
         
-        # Распознавание текста с сохранением координат
         ocr_results = reader.readtext(preprocessed_image)
         
-        # Фильтрация результатов с низкой уверенностью
         filtered_results = [result for result in ocr_results if result[2] > 0.2]
         
         if not filtered_results:
             return ["Текст не обнаружен на изображении"], "", []
         
-        # Сортировка результатов по вертикальной позиции для сохранения структуры строк
         sorted_results = sort_results_by_position(filtered_results)
         
-        # Группировка текста по строкам на основе вертикального положения
         grouped_results = group_by_lines(sorted_results)
         
-        # Формирование списка текстовых строк
         text_list = []
         for group in grouped_results:
             line = " ".join([clean_text(item[1]) for item in group])
             if line.strip():
                 text_list.append(line)
         
-        # Формирование полного текста с переносами строк
         full_text = "\n".join(text_list)
         
-        # Подготовка детальной информации
         details = []
         for result in sorted_results:
             bbox, text, confidence = result
-            # Convert NumPy array to regular Python list
             python_bbox = [[int(coord) for coord in point] for point in bbox]
             details.append({
                 "text": clean_text(text),
-                "confidence": float(confidence),  # Ensure float, not numpy.float
+                "confidence": float(confidence),
                 "bbox": python_bbox
             })
         
-        # Convert all results to Python native types to ensure JSON serialization
         text_list = convert_numpy_types(text_list)
         full_text = convert_numpy_types(full_text)
         details = convert_numpy_types(details)
@@ -404,66 +497,43 @@ def process_image_detailed(image_path):
         )
 
 def preprocess_image(image):
-    """
-    Предобработка изображения для улучшения результатов OCR.
-    """
-    # Конвертация в оттенки серого
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    # Бинаризация с адаптивным порогом
-    # Это помогает подчеркнуть текст на изображениях с переменной яркостью
     binary = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
     )
     
-    # Улучшение контраста
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
     
-    # Удаление шума
     denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
     
     return denoised
 
 def clean_text(text):
-    """
-    Очищает и нормализует распознанный текст.
-    """
-    # Удаление лишних пробелов
     cleaned = ' '.join(text.split())
     
-    # Убираем некоторые артефакты, которые могут появиться при OCR
     artifacts = ["[", "]", "{", "}", "~", "|", "^", "*", "+", "="]
     for artifact in artifacts:
         cleaned = cleaned.replace(artifact, "")
     
-    # Нормализация кавычек
     cleaned = cleaned.replace("\"", "\"").replace("\'", "'")
     
     return cleaned
 
 def sort_results_by_position(results):
-    """
-    Сортирует результаты OCR по их позиции на изображении (сверху вниз, слева направо).
-    """
-    # Сортировка по вертикальной позиции (y-координата верхней левой точки)
     return sorted(results, key=lambda r: (r[0][0][1], r[0][0][0]))
 
 def group_by_lines(results):
-    """
-    Группирует распознанные тексты по строкам на основе их вертикального положения.
-    """
     if not results:
         return []
     
-    # Определение средней высоты строки
     heights = [
         max(r[0][2][1], r[0][3][1]) - min(r[0][0][1], r[0][1][1])
         for r in results
     ]
     avg_height = sum(heights) / len(heights) if heights else 20
     
-    # Группировка по строкам
     groups = []
     current_group = [results[0]]
     
@@ -471,21 +541,16 @@ def group_by_lines(results):
         current_bbox = results[i][0]
         prev_bbox = results[i-1][0]
         
-        # Центры по Y
         current_center_y = (current_bbox[0][1] + current_bbox[2][1]) / 2
         prev_center_y = (prev_bbox[0][1] + prev_bbox[2][1]) / 2
         
-        # Если вертикальная разница меньше половины средней высоты строки,
-        # считаем, что это та же строка
         if abs(current_center_y - prev_center_y) < avg_height * 0.7:
             current_group.append(results[i])
         else:
-            # Сортируем группу по горизонтальной позиции
             current_group.sort(key=lambda r: r[0][0][0])
             groups.append(current_group)
             current_group = [results[i]]
     
-    # Добавляем последнюю группу
     if current_group:
         current_group.sort(key=lambda r: r[0][0][0])
         groups.append(current_group)
@@ -509,7 +574,8 @@ async def root():
             "ocr_base64": "/ocr/base64 - Отправка base64 изображения",
             "ocr_file_detailed": "/ocr/file/detailed - Детальное распознавание из файла",
             "ocr_base64_detailed": "/ocr/base64/detailed - Детальное распознавание из base64"
-        }
+        },
+        "telegram_bot": "Доступен Telegram бот для распознавания текста с изображений"
     }
 
 @app.get(
@@ -520,7 +586,7 @@ async def root():
 )
 async def api_info():
     return {
-        "name": "OCR API",
+        "name": "OCR API with Telegram Bot",
         "description": "API для распознавания текста из изображений с помощью EasyOCR",
         "version": "1.0.0",
         "supported_languages": ["ru", "en"],
@@ -546,6 +612,10 @@ async def api_info():
                 "method": "POST",
                 "description": "Детальное распознавание текста из base64 с сохранением структуры"
             }
+        },
+        "telegram_bot": {
+            "description": "Telegram бот для распознавания текста с изображений",
+            "usage": "Просто отправьте фото боту, и он вернет распознанный текст"
         }
     }
 
@@ -554,12 +624,13 @@ def custom_openapi():
         return app.openapi_schema
         
     openapi_schema = get_openapi(
-        title="OCR API",
+        title="OCR API with Telegram Bot",
         version="1.0.0",
         description="""
-        # OCR API для распознавания текста
+        # OCR API для распознавания текста с Telegram ботом
         
         Это API позволяет распознавать текст с изображений с использованием библиотеки EasyOCR.
+        Также доступен Telegram бот для удобного распознавания текста.
         
         ## Возможности
         
@@ -568,10 +639,12 @@ def custom_openapi():
         * Поддержка русского и английского языков
         * Сохранение структуры текста с переносами строк
         * Детальная информация о распознанном тексте
+        * Telegram бот для распознавания текста с фотографий
         
         ## Использование
         
         Отправьте запрос POST на /ocr/file, /ocr/base64, /ocr/file/detailed или /ocr/base64/detailed с изображением для анализа.
+        Или отправьте фотографию Telegram боту.
         """,
         routes=app.routes,
     )
@@ -596,7 +669,6 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Add OPTIONS handler for all routes to support CORS preflight requests
 @app.options("/{full_path:path}")
 async def options_route(full_path: str):
     return JSONResponse(
@@ -608,7 +680,6 @@ async def options_route(full_path: str):
         }
     )
 
-# Add a middleware to ensure CORS headers are applied to all responses
 @app.middleware("http")
 async def add_cors_headers(request, call_next):
     response = await call_next(request)
@@ -618,14 +689,64 @@ async def add_cors_headers(request, call_next):
     response.headers["Access-Control-Max-Age"] = "3600"
     return response
 
+async def run_telegram_bot():
+    try:
+        logger.info(f"Starting Telegram bot with token: {TELEGRAM_BOT_TOKEN[:5]}...[скрыто]")
+        
+        application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        
+        logger.info("Registering Telegram handlers...")
+        
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+        application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+        
+        application.add_error_handler(error_handler)
+        
+        logger.info("Initializing Telegram bot application...")
+        await application.initialize()
+        logger.info("Starting Telegram bot application...")
+        await application.start()
+        logger.info("Starting polling for Telegram updates...")
+        await application.updater.start_polling(drop_pending_updates=True)
+        
+        logger.info("✅ Telegram bot started successfully")
+        
+        try:
+            while True:
+                await asyncio.sleep(1)
+        finally:
+            logger.info("Stopping Telegram bot...")
+            await application.updater.stop()
+            await application.stop()
+            await application.shutdown()
+    except Exception as e:
+        logger.error(f"❌ Failed to start Telegram bot: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting FastAPI application...")
+    
+    if TELEGRAM_BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN" or not TELEGRAM_BOT_TOKEN:
+        logger.warning("⚠️ TELEGRAM_BOT_TOKEN is not set! Bot will not work until you set a valid token.")
+        logger.warning("Update the TELEGRAM_BOT_TOKEN variable with your actual bot token.")
+        return
+    
+    bot_task = asyncio.create_task(run_telegram_bot())
+    
+    app.state.bot_task = bot_task
+    
+    logger.info("✅ FastAPI application with Telegram bot integration started")
+
 if __name__ == "__main__":
     import uvicorn
     
-    # Enable debug logging
-    import logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("uvicorn")
     logger.setLevel(logging.INFO)
     
-    # Run the server
     uvicorn.run(app, host="127.0.0.1", port=3000)
