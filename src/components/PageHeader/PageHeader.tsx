@@ -21,39 +21,32 @@ const PageHeader: FC<PageHeaderProps> = () => {
    const navigate = useNavigate();
 
    useEffect(() => {
-      const fetchCurrentUser = async () => {
-         const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token");
 
-         if (!token) {
-            setIsAdmin(false);
-            return;
-         }
+      if (!token) {
+         setIsAdmin(false);
+         setNickname(null);
+         return;
+      }
 
-         try {
-            const response = await fetch(`${API_URL}/users/me`, {
-               headers: {
-                  Authorization: `Bearer ${token}`,
-               },
-            });
+      try {
+         const decoded: any = jwtDecode(token);
 
-            if (response.ok) {
-               const data = await response.json();
+         const userRole = decoded.role;
+         const userName = decoded.sub;
 
-               if (data.role === "admin") {
-                  setIsAdmin(true);
-               }
-
-               setNickname(data.name);
-            } else {
-               setIsAdmin(false);
-            }
-         } catch (error) {
-            console.error("Error fetching user data:", error);
+         if (userRole === "admin") {
+            setIsAdmin(true);
+         } else {
             setIsAdmin(false);
          }
-      };
 
-      fetchCurrentUser();
+         setNickname(userName);
+      } catch (error) {
+         console.error("Error decoding token:", error);
+         setIsAdmin(false);
+         setNickname(null);
+      }
    }, []);
 
    const handleLoginUpdate = () => {

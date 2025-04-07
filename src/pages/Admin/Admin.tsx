@@ -5,6 +5,8 @@ import "./Admin.css";
 import { Spinner, Alert, Button, Form, Pagination } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 
+import { jwtDecode } from "jwt-decode";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFaceFrown, faUser, faUserTie, faCheck, faXmark, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 
@@ -30,33 +32,19 @@ const Admin: FC = () => {
    const [usersPerPage] = useState(5);
 
    useEffect(() => {
-      const fetchCurrentUser = async () => {
-         const token = localStorage.getItem("token");
-         if (!token) {
-            setIsLoggedIn(false);
-            return;
-         }
+      const token = localStorage.getItem("token");
 
-         const response = await fetch(`${API_URL}/users/me`, {
-            headers: {
-               Authorization: `Bearer ${token}`,
-            },
-         });
+      if (token) {
+         const decoded: any = jwtDecode(token);
 
-         if (response.ok) {
-            const data = await response.json();
+         const userRole = decoded.role;
 
-            if (data.role === "admin") {
-               setIsLoggedIn(true);
-            } else {
-               setIsLoggedIn(false);
-            }
+         if (userRole === "admin") {
+            setIsLoggedIn(true);
          } else {
             setIsLoggedIn(false);
          }
-      };
-
-      fetchCurrentUser();
+      }
 
       const handleLogOutUpdate = () => setIsLoggedIn(false);
       window.addEventListener("loggedOut", handleLogOutUpdate);
@@ -75,7 +63,11 @@ const Admin: FC = () => {
             if (!response.ok) {
                throw new Error("Error while receiving data.");
             }
+            const text = await response.text();
+            console.log("Answer server:", text);
+
             const data = await response.json();
+
             setUsers(data);
          } catch (error) {
             setErrorMessage("Failed to load users.");
