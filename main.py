@@ -124,6 +124,13 @@ async def get_subscription_status(username: str, db: Session = Depends(get_db)):
 class SubscriptionUpdate(BaseModel):
     subscription_status: str
 
+@app.get("/users", response_model=list[UserCreate])
+async def get_all_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can view all users")
+    users = db.query(User).all()
+    return [{"name": user.name, "password": user.hashed_password, "role": user.role} for user in users]
+
 @app.put("/update_subscription/{username}")
 async def update_subscription(username: str, update_data: SubscriptionUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.role != "admin":
