@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -27,8 +27,12 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role = Column(String, default="user")  # user or admin
+    role = Column(String, default="user")  
     subscription_status = Column(String, default="inactive")
+    registered_at = Column(DateTime, default=datetime.utcnow)  
+    last_login = Column(DateTime, nullable=True)  
+    session_duration = Column(Float, nullable=True) 
+    activity_count_last_30_days = Column(Integer, default=0)
 
 Base.metadata.create_all(bind=engine)
 
@@ -74,6 +78,27 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def count_user_activity_in_last_30_days(user: User, db: Session):
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    activity_count = db.query(User).filter(User.id == user.id, User.last_login > thirty_days_ago).count()
+    return activity_count
+
+def update_activity_count(user: User, db: Session):
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    login_count = db.query(User).filter(User.id == user.id, User.last_login > thirty_days_ago).count()
+    
+    user.activity_count_last_30_days = login_count
+    db.commit()
+
+class UserResponse(BaseModel):
+    name: str
+    password: str
+    role: str
+    subscription_status: str  
+
+    class Config:
+        orm_mode = True
+
 class UserCreate(BaseModel):
     name: str
     password: str
@@ -91,8 +116,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     user = get_user(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    now = datetime.utcnow()
+    if user.last_login:
+        user.session_duration = (now - user.last_login).total_seconds()
+
+    user.last_login = now
+    db.commit()
+
+    update_activity_count(user, db)
+
     access_token = create_access_token(data={"sub": user.name, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
@@ -124,12 +161,49 @@ async def get_subscription_status(username: str, db: Session = Depends(get_db)):
 class SubscriptionUpdate(BaseModel):
     subscription_status: str
 
-@app.get("/users", response_model=list[UserCreate])
+@app.get("/users", response_model=list[UserResponse])  
 async def get_all_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can view all users")
     users = db.query(User).all()
-    return [{"name": user.name, "password": user.hashed_password, "role": user.role} for user in users]
+    return [
+        {"name": user.name, "password": user.hashed_password, "role": user.role, "subscription_status": user.subscription_status}
+        for user in users
+    ]
+
+@app.get("/analytics")
+def get_analytics(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    users = db.query(User).all()
+    return [
+        {
+            "username": user.name,
+            "registered_at": user.registered_at,
+            "last_login": user.last_login,
+            "session_duration": user.session_duration,
+            "activity_last_30_days": user.activity_count_last_30_days,  
+        }
+        for user in users
+    ]
+
+@app.get("/analytics/{username}")
+def get_user_analytics(username: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    target_user = get_user(db, username)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied. Only admin")
+
+    return {
+        "username": target_user.name,
+        "registered_at": target_user.registered_at,
+        "last_login": target_user.last_login,
+        "session_duration": target_user.session_duration,
+        "activity_last_30_days": target_user.activity_count_last_30_days
+    }
 
 @app.put("/update_subscription/{username}")
 async def update_subscription(username: str, update_data: SubscriptionUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
