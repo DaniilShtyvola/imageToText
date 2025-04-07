@@ -101,7 +101,7 @@ const Main: FC = () => {
          const AI_API_URL = import.meta.env.VITE_AI_API_URL;
          const base64Image = image.split(",")[1];
 
-         const fullUrl = `${AI_API_URL}/ocr/base64/detailed`
+         const fullUrl = `${AI_API_URL}/ocr/base64/detailed`;
          console.log("Send image to:", fullUrl);
 
          const response = await fetch(fullUrl, {

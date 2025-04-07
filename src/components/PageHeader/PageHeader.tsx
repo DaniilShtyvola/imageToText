@@ -6,35 +6,74 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRightToBracket, faRightFromBracket, faImage } from "@fortawesome/free-solid-svg-icons";
+import { faRightToBracket, faRightFromBracket, faImage, faScrewdriverWrench } from "@fortawesome/free-solid-svg-icons";
 
 import { Container, Navbar, Nav, Dropdown } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface PageHeaderProps {}
 
 const PageHeader: FC<PageHeaderProps> = () => {
    const [nickname, setNickname] = useState<string | null>(null);
+   const [isAdmin, setIsAdmin] = useState<boolean>(false);
    const navigate = useNavigate();
 
    useEffect(() => {
-      const handleLoginUpdate = () => {
+      const fetchCurrentUser = async () => {
          const token = localStorage.getItem("token");
 
-         if (token) {
-            try {
-               const decoded: any = jwtDecode(token);
-               const username = decoded.sub;
+         if (!token) {
+            setIsAdmin(false);
+            return;
+         }
 
-               if (username) {
-                  setNickname(username);
+         try {
+            const response = await fetch(`${API_URL}/users/me`, {
+               headers: {
+                  Authorization: `Bearer ${token}`,
+               },
+            });
+
+            if (response.ok) {
+               const data = await response.json();
+
+               if (data.role === "admin") {
+                  setIsAdmin(true);
                }
-            } catch (error) {
-               console.error("Error decoding token: ", error);
+
+               setNickname(data.name);
+            } else {
+               setIsAdmin(false);
             }
+         } catch (error) {
+            console.error("Error fetching user data:", error);
+            setIsAdmin(false);
          }
       };
 
+      fetchCurrentUser();
+   }, []);
+
+   const handleLoginUpdate = () => {
+      const token = localStorage.getItem("token");
+
+      if (token) {
+         try {
+            const decoded: any = jwtDecode(token);
+            const username = decoded.sub;
+
+            if (username) {
+               setNickname(username);
+            }
+         } catch (error) {
+            console.error("Error decoding token: ", error);
+         }
+      }
+   };
+
+   useEffect(() => {
       handleLoginUpdate();
       window.addEventListener("loggedIn", handleLoginUpdate);
 
@@ -47,6 +86,7 @@ const PageHeader: FC<PageHeaderProps> = () => {
       localStorage.removeItem("token");
       window.dispatchEvent(new Event("loggedOut"));
       setNickname(null);
+      setIsAdmin(false);
       navigate("/");
    };
 
@@ -64,6 +104,11 @@ const PageHeader: FC<PageHeaderProps> = () => {
                      {!nickname && (
                         <Nav.Link as={Link} to='/login' style={{ paddingRight: "22px" }}>
                            <FontAwesomeIcon icon={faRightToBracket} /> Log in
+                        </Nav.Link>
+                     )}
+                     {isAdmin && nickname && (
+                        <Nav.Link as={Link} to='/admin' style={{ paddingRight: "22px" }}>
+                           <FontAwesomeIcon icon={faScrewdriverWrench} /> Admin Panel
                         </Nav.Link>
                      )}
                   </Nav>

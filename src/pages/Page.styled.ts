@@ -5,7 +5,6 @@ export const PageWrapper = styled.div`
    display: flex;
    justify-content: center;
    background-color: rgb(23, 25, 27);
-   height: auto;
    min-height: 92vh;
 `;
 
