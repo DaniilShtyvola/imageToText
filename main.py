@@ -266,6 +266,9 @@ async def block_user(username: str, request: BlockUserRequest, current_user: Use
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    if user.role == "admin":
+        raise HTTPException(status_code=403, detail="You cannot block another admin")
+
     user.is_blocked = 1 if request.is_blocked else 0
     user.block_reason = request.block_reason
     user.blocked_by = current_user.name  
