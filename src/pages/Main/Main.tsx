@@ -51,7 +51,7 @@ const Main: FC = () => {
          return false;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = "http://127.0.0.1:8000";
 
       const url = `${API_URL}/subscription_status/${username}`;
       console.log(`Check subscription: ${url}`);

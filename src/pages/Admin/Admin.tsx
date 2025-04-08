@@ -8,359 +8,238 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { jwtDecode } from "jwt-decode";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFaceFrown, faUser, faUserTie, faCheck, faXmark, faMagnifyingGlass, faInfo } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFaceFrown,
+  faUser,
+  faUserTie,
+  faCheck,
+  faXmark,
+  faMagnifyingGlass,
+  faInfo,
+} from "@fortawesome/free-solid-svg-icons";
 
 import UserInfoModal from "../../components/UserInfoModal/UserInfoModal.tsx";
 import GoogleChart from "../../components/GoogleChart/GoogleChart.tsx";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = "http://127.0.0.1:8000";
 
 interface User {
-   name: string;
-   password: string;
-   role: string;
-   subscription_status: string;
+  name: string;
+  password: string;
+  role: string;
+  subscription_status: string;
 }
 
 interface UserAnalytics {
-   username: string;
-   registered_at: string;
-   last_login: string;
-   session_duration: number | null;
-   activity_last_30_days: number;
-};
+  username: string;
+  registered_at: string;
+  last_login: string;
+  session_duration: number | null;
+  activity_last_30_days: number;
+}
 
 const Admin: FC = () => {
-   const [loading, setLoading] = useState(false);
-   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [analytics, setAnalytics] = useState<UserAnalytics[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const usersPerPage = 6;
 
-   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-   const [users, setUsers] = useState<User[]>([]);
-   const [analytics, setAnalytics] = useState<UserAnalytics[]>([]);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      const decoded: any = jwtDecode(token);
+      setIsLoggedIn(decoded.role === "admin");
+    }
+    const handleLogOutUpdate = () => setIsLoggedIn(false);
+    window.addEventListener("loggedOut", handleLogOutUpdate);
+    return () => window.removeEventListener("loggedOut", handleLogOutUpdate);
+  }, []);
 
-   const [searchTerm, setSearchTerm] = useState<string>("");
-
-   const [currentPage, setCurrentPage] = useState(1);
-   const [usersPerPage] = useState(6);
-
-   const [showUserModal, setShowUserModal] = useState(false);
-   const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
-
-   const handleUserInfoModal = (username: string) => {
-      setSelectedUsername(username);
-      setShowUserModal(true);
-   };
-
-   const handleCloseUserModal = () => {
-      setShowUserModal(false);
-      setSelectedUsername(null);
-   };
-
-   useEffect(() => {
-      const token = localStorage.getItem("token");
-
-      if (token) {
-         const decoded: any = jwtDecode(token);
-
-         const userRole = decoded.role;
-
-         if (userRole === "admin") {
-            setIsLoggedIn(true);
-         } else {
-            setIsLoggedIn(false);
-         }
-      }
-
-      const handleLogOutUpdate = () => setIsLoggedIn(false);
-      window.addEventListener("loggedOut", handleLogOutUpdate);
-      return () => window.removeEventListener("loggedOut", handleLogOutUpdate);
-   }, []);
-
-   useEffect(() => {
-      const fetchUsers = async () => {
-         setLoading(true);
-         try {
-            const response = await fetch(`${API_URL}/users`, {
-               headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-               },
-            });
-            if (!response.ok) {
-               throw new Error("Error while receiving data.");
-            }
-            const text = await response.text();
-            console.log("Answer server:", text);
-
-            const data = await response.json();
-
-            setUsers(data);
-         } catch (error) {
-            setErrorMessage("Failed to load users.");
-         } finally {
-            setLoading(false);
-         }
-      };
-
-      const fetchAnalytics = async () => {
-         setLoading(true);
-         try {
-            const response = await fetch(`${API_URL}/analytics`, {
-               headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-               },
-            });
-
-            if (!response.ok) {
-               throw new Error("Error while receiving analytics data.");
-            }
-
-            const data = await response.json();
-            console.log("Analytics data:", data);
-
-            setAnalytics(data);
-         } catch (error) {
-            console.error(error);
-            setErrorMessage("Failed to load analytics.");
-         } finally {
-            setLoading(false);
-         }
-      };
-
-      fetchAnalytics();
-      fetchUsers();
-   }, []);
-
-   const handleSubscriptionUpdate = async (username: string, currentStatus: string) => {
-      const newStatus = currentStatus === "active" ? "inactive" : "active";
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
       try {
-         const response = await fetch(`${API_URL}/update_subscription/${username}`, {
-            method: "PUT",
-            headers: {
-               "Content-Type": "application/json",
-               Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({
-               subscription_status: newStatus,
-            }),
-         });
-
-         if (!response.ok) {
-            throw new Error("Error updating subscription.");
-         }
-
-         setUsers((prevUsers) =>
-            prevUsers.map((user) => (user.name === username ? { ...user, subscription_status: newStatus } : user)),
-         );
+        const response = await fetch(`${API_URL}/users`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const data = await response.json();
+        setUsers(data);
       } catch (error) {
-         setErrorMessage("Failed to update subscription status.");
+        setErrorMessage("Failed to load users.");
+      } finally {
+        setLoading(false);
       }
-   };
+    };
 
-   const filteredUsers = users.filter((user) => user.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const fetchAnalytics = async () => {
+      try {
+        const response = await fetch(`${API_URL}/analytics`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const data = await response.json();
+        setAnalytics(data);
+      } catch (error) {
+        setErrorMessage("Failed to load analytics.");
+      }
+    };
 
-   const indexOfLastUser = currentPage * usersPerPage;
-   const indexOfFirstUser = indexOfLastUser - usersPerPage;
-   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+    fetchUsers();
+    fetchAnalytics();
+  }, []);
 
-   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const handleSubscriptionUpdate = async (username: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    try {
+      await fetch(`${API_URL}/update_subscription/${username}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ subscription_status: newStatus }),
+      });
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.name === username ? { ...user, subscription_status: newStatus } : user
+        )
+      );
+    } catch {
+      setErrorMessage("Failed to update subscription status.");
+    }
+  };
 
-   const pageNumbers = [];
-   for (let i = 1; i <= Math.ceil(filteredUsers.length / usersPerPage); i++) {
-      pageNumbers.push(i);
-   }
+  const filteredUsers = users.filter((user) =>
+    user.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-   return (
-      <PageWrapper>
-         <PageContainer>
-            {isLoggedIn ? (
-               <div style={{
-                  width: "100%",
-                  display: "flex",
-                  gap: "18px"
-               }}>
-                  <div style={{ width: "100%" }}>
-                     <div
-                        style={{
-                           display: "flex",
-                           justifyContent: "space-between",
-                        }}
-                     >
-                        <div
-                           style={{
-                              display: "flex",
-                              alignItems: "center",
-                              marginBottom: "20px",
-                           }}
+  const indexOfLastUser = currentPage * usersPerPage;
+  const indexOfFirstUser = indexOfLastUser - usersPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+
+  const pageNumbers = Array.from(
+    { length: Math.ceil(filteredUsers.length / usersPerPage) },
+    (_, i) => i + 1
+  );
+
+  return (
+    <PageWrapper>
+      <PageContainer>
+        {isLoggedIn ? (
+          <div style={{ width: "100%", display: "flex", gap: "18px" }}>
+            <div style={{ width: "100%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <Form.Control
+                  className="FormPlaceholder"
+                  type="text"
+                  placeholder="Enter username"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ minWidth: "200px", backgroundColor: "#212529", color: "white" }}
+                />
+              </div>
+              {loading ? (
+                <Spinner animation="border" />
+              ) : errorMessage ? (
+                <Alert variant="danger">{errorMessage}</Alert>
+              ) : (
+                <>
+                  {currentUsers.map((user) => (
+                    <div
+                      key={user.name}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        border: "1px solid #212529",
+                        borderRadius: "8px",
+                        padding: "8px",
+                        marginBottom: "12px",
+                        color: "white",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <FontAwesomeIcon
+                          icon={user.role === "user" ? faUser : faUserTie}
+                          style={{ fontSize: "185%", marginRight: "12px", color: "#ccc" }}
+                        />
+                        <div>
+                          <p style={{ margin: 0 }}>{user.name}</p>
+                          <p style={{ margin: 0, fontSize: "70%", color: "#aaa" }}>{user.role}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <Button
+                          variant={user.subscription_status === "active" ? "success" : "danger"}
+                          onClick={() => handleSubscriptionUpdate(user.name, user.subscription_status)}
                         >
-                           <FontAwesomeIcon
-                              style={{
-                                 fontSize: "140%",
-                                 color: "rgb(33, 37, 41)",
-                                 marginRight: "12px",
-                              }}
-                              icon={faMagnifyingGlass}
-                           />
-                           <Form.Control
-                              className='FormPlaceholder'
-                              type='text'
-                              id='inputUserName'
-                              placeholder='Enter username'
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              style={{
-                                 width: "auto",
-                                 minWidth: "200px",
-                                 backgroundColor: "rgb(33, 37, 41)",
-                                 border: "1px solid rgb(33, 37, 41)",
-                                 color: "white",
-                                 display: "inline-block",
-                              }}
-                           />
-                        </div>
-                     </div>
-                     <div style={{ display: "flex", width: "100%", gap: "20px" }}>
-                        <div style={{ width: "100%" }}>
-                           {loading ? (
-                              <Spinner animation='border' />
-                           ) : errorMessage ? (
-                              <Alert variant='danger'>{errorMessage}</Alert>
-                           ) : (
-                              <>
-                                 {currentUsers.map((user) => (
-                                    <div
-                                       style={{
-                                          display: "flex",
-                                          justifyContent: "space-between",
-                                          border: "1px solid rgb(33, 37, 41)",
-                                          borderRadius: "8px",
-                                          alignItems: "center",
-                                          padding: "8px",
-                                          marginBottom: "12px",
-                                          color: "white",
-                                       }}
-                                    >
-                                       <div
-                                          style={{
-                                             display: "flex",
-                                             alignItems: "center",
-                                          }}
-                                       >
-                                          <FontAwesomeIcon
-                                             style={{
-                                                fontSize: "185%",
-                                                color: "rgba(255, 255, 255, 0.55)",
-                                                marginRight: "12px",
-                                             }}
-                                             icon={user.role == "user" ? faUser : faUserTie}
-                                          />
-                                          <div>
-                                             <p style={{ margin: 0 }}>{user.name}</p>
-                                             <p
-                                                style={{
-                                                   margin: 0,
-                                                   fontSize: "70%",
-                                                   color: "rgba(255, 255, 255, 0.55)",
-                                                }}
-                                             >
-                                                {user.role}
-                                             </p>
-                                          </div>
-                                       </div>
-                                       <div
-                                          style={{
-                                             display: "flex",
-                                          }}
-                                       >
-                                          <p
-                                             style={{
-                                                margin: 0,
-                                                fontSize: "80%",
-                                                color: "rgba(255, 255, 255, 0.55)",
-                                                width: "80px",
-                                                textAlign: "right",
-                                                marginRight: "8px",
-                                             }}
-                                          >
-                                             Subscription status:{" "}
-                                          </p>
-                                          <Button
-                                             variant={user.subscription_status == "active" ? "success" : "danger"}
-                                             style={{
-                                                width: "40px",
-                                             }}
-                                             onClick={() => handleSubscriptionUpdate(user.name, user.subscription_status)}
-                                          >
-                                             <FontAwesomeIcon
-                                                style={{
-                                                   fontSize: "115%",
-                                                }}
-                                                icon={user.subscription_status == "active" ? faCheck : faXmark}
-                                             />
-                                          </Button>
-                                          <Button
-                                             style={{
-                                                width: "40px",
-                                                marginLeft: "8px",
-                                             }}
-                                             onClick={() => handleUserInfoModal(user.name)}
-                                             variant="dark"
-                                          >
-                                             <FontAwesomeIcon
-                                                style={{
-                                                   fontSize: "115%",
-                                                }}
-                                                icon={faInfo}
-                                             />
-                                          </Button>
-                                       </div>
-                                    </div>
-                                 ))}
-                                 {pageNumbers.length > 1 && (
-                                    <Pagination style={{
-                                       display: "flex",
-                                       justifyContent: "center"
-                                    }}>
-                                       <Pagination.Prev
-                                          onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
-                                       />
-                                       {pageNumbers.map((number) => (
-                                          <Pagination.Item
-                                             key={number}
-                                             active={number === currentPage}
-                                             onClick={() => paginate(number)}
-                                          >
-                                             {number}
-                                          </Pagination.Item>
-                                       ))}
-                                       <Pagination.Next
-                                          onClick={() =>
-                                             currentPage < pageNumbers.length && setCurrentPage(currentPage + 1)
-                                          }
-                                       />
-                                    </Pagination>
-                                 )}
-                              </>
-                           )}
-                        </div>
-                     </div>
-                  </div>
-                  <div style={{
-                     width: "100%"
-                  }}>
-                     <GoogleChart data={analytics} />
-                  </div>
-               </div>
-            ) : (
-               <p style={{ color: "rgba(255, 255, 255, 0.55)", textAlign: "center" }}>
-                  <FontAwesomeIcon icon={faFaceFrown} /> You must be logged in as admin to use this.
-               </p>
-            )}
-            {selectedUsername && (
-               <UserInfoModal username={selectedUsername} showModal={showUserModal} handleClose={handleCloseUserModal} />
-            )}
-         </PageContainer>
-      </PageWrapper>
-   );
+                          <FontAwesomeIcon icon={user.subscription_status === "active" ? faCheck : faXmark} />
+                        </Button>
+                        <Button variant="dark" onClick={() => {
+                          setSelectedUsername(user.name);
+                          setShowUserModal(true);
+                        }}>
+                          <FontAwesomeIcon icon={faInfo} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {pageNumbers.length > 1 && (
+                    <Pagination className="justify-content-center">
+                      <Pagination.Prev onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} />
+                      {pageNumbers.map((number) => (
+                        <Pagination.Item
+                          key={number}
+                          active={number === currentPage}
+                          onClick={() => setCurrentPage(number)}
+                        >
+                          {number}
+                        </Pagination.Item>
+                      ))}
+                      <Pagination.Next
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            prev < pageNumbers.length ? prev + 1 : prev
+                          )
+                        }
+                      />
+                    </Pagination>
+                  )}
+                </>
+              )}
+            </div>
+            <div style={{ width: "100%" }}>
+              <GoogleChart data={analytics} />
+            </div>
+          </div>
+        ) : (
+          <p style={{ color: "#aaa", textAlign: "center" }}>
+            <FontAwesomeIcon icon={faFaceFrown} /> You must be logged in as admin to use this.
+          </p>
+        )}
+
+        {selectedUsername && (
+          <UserInfoModal
+            username={selectedUsername}
+            showModal={showUserModal}
+            handleClose={() => {
+              setShowUserModal(false);
+              setSelectedUsername(null);
+            }}
+          />
+        )}
+      </PageContainer>
+    </PageWrapper>
+  );
 };
 
 export default Admin;
