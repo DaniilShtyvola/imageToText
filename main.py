@@ -38,6 +38,8 @@ class User(Base):
     activity_count_last_30_days = Column(Integer, default=0)
     is_blocked = Column(Integer, default=0) 
     block_reason = Column(String, nullable=True)
+    blocked_by = Column(String, nullable=True)  
+    blocked_at = Column(DateTime, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -100,6 +102,8 @@ class UserResponse(BaseModel):
     role: str
     subscription_status: str
     block_reason: Optional[str] = None 
+    blocked_by: Optional[str] = None 
+    blocked_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -128,8 +132,17 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     user = get_user(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    
     if user.is_blocked:
-        raise HTTPException(status_code=403, detail="User is blocked")
+        block_info = {
+            "blocked_by": user.blocked_by,
+            "block_reason": user.block_reason,
+            "blocked_at": user.blocked_at
+        }
+        raise HTTPException(
+            status_code=403, 
+            detail=f"User is blocked. Details: Blocked by: {block_info['blocked_by']}, Reason: {block_info['block_reason']}, Time: {block_info['blocked_at']}"
+        )
 
     now = datetime.utcnow()
     if user.last_login:
@@ -227,11 +240,12 @@ async def get_blocked_users(current_user: User = Depends(get_current_user), db: 
             "password": user.hashed_password,
             "role": user.role,
             "subscription_status": user.subscription_status,
-            "block_reason": user.block_reason 
+            "block_reason": user.block_reason,
+            "blocked_by": user.blocked_by,
+            "blocked_at": user.blocked_at
         }
         for user in blocked_users
     ]
-
 
 @app.put("/update_subscription/{username}")
 async def update_subscription(username: str, update_data: SubscriptionUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -253,9 +267,10 @@ async def block_user(username: str, request: BlockUserRequest, current_user: Use
         raise HTTPException(status_code=404, detail="User not found")
     
     user.is_blocked = 1 if request.is_blocked else 0
-    user.block_reason = request.block_reason  
+    user.block_reason = request.block_reason
+    user.blocked_by = current_user.name  
+    user.blocked_at = datetime.utcnow() 
     db.commit()
 
     status_text = "blocked" if request.is_blocked else "unblocked"
-    return {"message": f"User {username} has been {status_text} with reason: {request.block_reason if request.block_reason else 'No reason provided'}"}
-
+    return {"message": f"User {username} has been {status_text} by {current_user.name} with reason: {request.block_reason if request.block_reason else 'No reason provided'}"}
