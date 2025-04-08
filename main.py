@@ -220,7 +220,7 @@ async def get_blocked_users(current_user: User = Depends(get_current_user), db: 
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can view blocked users")
     
-    blocked_users = db.query(User).filter(User.is_blocked == 1).all()  # Заблокированные пользователи
+    blocked_users = db.query(User).filter(User.is_blocked == 1).all() 
     return [
         {
             "name": user.name,
@@ -253,7 +253,7 @@ async def block_user(username: str, request: BlockUserRequest, current_user: Use
         raise HTTPException(status_code=404, detail="User not found")
     
     user.is_blocked = 1 if request.is_blocked else 0
-    user.block_reason = request.block_reason  # Обновляем причину блокировки
+    user.block_reason = request.block_reason  
     db.commit()
 
     status_text = "blocked" if request.is_blocked else "unblocked"
