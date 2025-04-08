@@ -1,0 +1,10 @@
+Библиотеки:
+pip install fastapi
+pip install sqlalchemy
+pip install pydantic
+pip install passlib
+pip install python-dotenv
+pip install pyjwt
+pip install uvicorn
+
+запуск - python -m uvicorn main:app --reload
