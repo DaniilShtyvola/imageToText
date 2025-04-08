@@ -8,7 +8,10 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { jwtDecode } from "jwt-decode";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFaceFrown, faUser, faUserTie, faCheck, faXmark, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faFaceFrown, faUser, faUserTie, faCheck, faXmark, faMagnifyingGlass, faInfo } from "@fortawesome/free-solid-svg-icons";
+
+import UserInfoModal from "../../components/UserInfoModal/UserInfoModal.tsx";
+import GoogleChart from "../../components/GoogleChart/GoogleChart.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -19,17 +22,39 @@ interface User {
    subscription_status: string;
 }
 
+interface UserAnalytics {
+   username: string;
+   registered_at: string;
+   last_login: string;
+   session_duration: number | null;
+   activity_last_30_days: number;
+};
+
 const Admin: FC = () => {
    const [loading, setLoading] = useState(false);
    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
    const [errorMessage, setErrorMessage] = useState<string | null>(null);
    const [users, setUsers] = useState<User[]>([]);
+   const [analytics, setAnalytics] = useState<UserAnalytics[]>([]);
 
    const [searchTerm, setSearchTerm] = useState<string>("");
 
    const [currentPage, setCurrentPage] = useState(1);
-   const [usersPerPage] = useState(5);
+   const [usersPerPage] = useState(6);
+
+   const [showUserModal, setShowUserModal] = useState(false);
+   const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+
+   const handleUserInfoModal = (username: string) => {
+      setSelectedUsername(username);
+      setShowUserModal(true);
+   };
+
+   const handleCloseUserModal = () => {
+      setShowUserModal(false);
+      setSelectedUsername(null);
+   };
 
    useEffect(() => {
       const token = localStorage.getItem("token");
@@ -75,6 +100,33 @@ const Admin: FC = () => {
             setLoading(false);
          }
       };
+
+      const fetchAnalytics = async () => {
+         setLoading(true);
+         try {
+            const response = await fetch(`${API_URL}/analytics`, {
+               headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+               },
+            });
+
+            if (!response.ok) {
+               throw new Error("Error while receiving analytics data.");
+            }
+
+            const data = await response.json();
+            console.log("Analytics data:", data);
+
+            setAnalytics(data);
+         } catch (error) {
+            console.error(error);
+            setErrorMessage("Failed to load analytics.");
+         } finally {
+            setLoading(false);
+         }
+      };
+
+      fetchAnalytics();
       fetchUsers();
    }, []);
 
@@ -119,164 +171,192 @@ const Admin: FC = () => {
 
    return (
       <PageWrapper>
-         <PageContainer
-            style={{
-               width: "600px",
-            }}
-         >
+         <PageContainer>
             {isLoggedIn ? (
-               <div style={{ width: "100%" }}>
-                  <div
-                     style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                     }}
-                  >
+               <div style={{
+                  width: "100%",
+                  display: "flex",
+                  gap: "18px"
+               }}>
+                  <div style={{ width: "100%" }}>
                      <div
                         style={{
                            display: "flex",
-                           alignItems: "center",
-                           marginBottom: "20px",
+                           justifyContent: "space-between",
                         }}
                      >
-                        <FontAwesomeIcon
+                        <div
                            style={{
-                              fontSize: "140%",
-                              color: "rgb(33, 37, 41)",
-                              marginRight: "12px",
+                              display: "flex",
+                              alignItems: "center",
+                              marginBottom: "20px",
                            }}
-                           icon={faMagnifyingGlass}
-                        />
-                        <Form.Control
-                           className='FormPlaceholder'
-                           type='text'
-                           id='inputUserName'
-                           placeholder='Enter username'
-                           value={searchTerm}
-                           onChange={(e) => setSearchTerm(e.target.value)}
-                           style={{
-                              width: "auto",
-                              minWidth: "200px",
-                              backgroundColor: "rgb(33, 37, 41)",
-                              border: "1px solid rgb(33, 37, 41)",
-                              color: "white",
-                              display: "inline-block",
-                           }}
-                        />
+                        >
+                           <FontAwesomeIcon
+                              style={{
+                                 fontSize: "140%",
+                                 color: "rgb(33, 37, 41)",
+                                 marginRight: "12px",
+                              }}
+                              icon={faMagnifyingGlass}
+                           />
+                           <Form.Control
+                              className='FormPlaceholder'
+                              type='text'
+                              id='inputUserName'
+                              placeholder='Enter username'
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              style={{
+                                 width: "auto",
+                                 minWidth: "200px",
+                                 backgroundColor: "rgb(33, 37, 41)",
+                                 border: "1px solid rgb(33, 37, 41)",
+                                 color: "white",
+                                 display: "inline-block",
+                              }}
+                           />
+                        </div>
                      </div>
-                  </div>
-                  <div style={{ display: "flex", width: "100%", gap: "20px" }}>
-                     <div style={{ width: "100%" }}>
-                        {loading ? (
-                           <Spinner animation='border' />
-                        ) : errorMessage ? (
-                           <Alert variant='danger'>{errorMessage}</Alert>
-                        ) : (
-                           <>
-                              {currentUsers.map((user) => (
-                                 <div
-                                    style={{
-                                       display: "flex",
-                                       justifyContent: "space-between",
-                                       border: "1px solid rgb(33, 37, 41)",
-                                       borderRadius: "8px",
-                                       alignItems: "center",
-                                       padding: "8px",
-                                       marginBottom: "12px",
-                                       color: "white",
-                                    }}
-                                 >
+                     <div style={{ display: "flex", width: "100%", gap: "20px" }}>
+                        <div style={{ width: "100%" }}>
+                           {loading ? (
+                              <Spinner animation='border' />
+                           ) : errorMessage ? (
+                              <Alert variant='danger'>{errorMessage}</Alert>
+                           ) : (
+                              <>
+                                 {currentUsers.map((user) => (
                                     <div
                                        style={{
                                           display: "flex",
+                                          justifyContent: "space-between",
+                                          border: "1px solid rgb(33, 37, 41)",
+                                          borderRadius: "8px",
                                           alignItems: "center",
+                                          padding: "8px",
+                                          marginBottom: "12px",
+                                          color: "white",
                                        }}
                                     >
-                                       <FontAwesomeIcon
+                                       <div
                                           style={{
-                                             fontSize: "185%",
-                                             color: "rgba(255, 255, 255, 0.55)",
-                                             marginRight: "12px",
+                                             display: "flex",
+                                             alignItems: "center",
                                           }}
-                                          icon={user.role == "user" ? faUser : faUserTie}
-                                       />
-                                       <div>
-                                          <p style={{ margin: 0 }}>{user.name}</p>
-                                          <p
-                                             style={{
-                                                margin: 0,
-                                                fontSize: "70%",
-                                                color: "rgba(255, 255, 255, 0.55)",
-                                             }}
-                                          >
-                                             {user.role}
-                                          </p>
-                                       </div>
-                                    </div>
-                                    <div
-                                       style={{
-                                          display: "flex",
-                                       }}
-                                    >
-                                       <p
-                                          style={{
-                                             margin: 0,
-                                             fontSize: "80%",
-                                             color: "rgba(255, 255, 255, 0.55)",
-                                             width: "80px",
-                                             textAlign: "right",
-                                             marginRight: "8px",
-                                          }}
-                                       >
-                                          Subscription status:{" "}
-                                       </p>
-                                       <Button
-                                          variant={user.subscription_status == "active" ? "success" : "danger"}
-                                          style={{
-                                             width: "40px",
-                                          }}
-                                          onClick={() => handleSubscriptionUpdate(user.name, user.subscription_status)}
                                        >
                                           <FontAwesomeIcon
                                              style={{
-                                                fontSize: "115%",
+                                                fontSize: "185%",
+                                                color: "rgba(255, 255, 255, 0.55)",
+                                                marginRight: "12px",
                                              }}
-                                             icon={user.subscription_status == "active" ? faCheck : faXmark}
+                                             icon={user.role == "user" ? faUser : faUserTie}
                                           />
-                                       </Button>
-                                    </div>
-                                 </div>
-                              ))}
-                              {pageNumbers.length > 1 && (
-                                 <Pagination>
-                                    <Pagination.Prev
-                                       onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
-                                    />
-                                    {pageNumbers.map((number) => (
-                                       <Pagination.Item
-                                          key={number}
-                                          active={number === currentPage}
-                                          onClick={() => paginate(number)}
+                                          <div>
+                                             <p style={{ margin: 0 }}>{user.name}</p>
+                                             <p
+                                                style={{
+                                                   margin: 0,
+                                                   fontSize: "70%",
+                                                   color: "rgba(255, 255, 255, 0.55)",
+                                                }}
+                                             >
+                                                {user.role}
+                                             </p>
+                                          </div>
+                                       </div>
+                                       <div
+                                          style={{
+                                             display: "flex",
+                                          }}
                                        >
-                                          {number}
-                                       </Pagination.Item>
-                                    ))}
-                                    <Pagination.Next
-                                       onClick={() =>
-                                          currentPage < pageNumbers.length && setCurrentPage(currentPage + 1)
-                                       }
-                                    />
-                                 </Pagination>
-                              )}
-                           </>
-                        )}
+                                          <p
+                                             style={{
+                                                margin: 0,
+                                                fontSize: "80%",
+                                                color: "rgba(255, 255, 255, 0.55)",
+                                                width: "80px",
+                                                textAlign: "right",
+                                                marginRight: "8px",
+                                             }}
+                                          >
+                                             Subscription status:{" "}
+                                          </p>
+                                          <Button
+                                             variant={user.subscription_status == "active" ? "success" : "danger"}
+                                             style={{
+                                                width: "40px",
+                                             }}
+                                             onClick={() => handleSubscriptionUpdate(user.name, user.subscription_status)}
+                                          >
+                                             <FontAwesomeIcon
+                                                style={{
+                                                   fontSize: "115%",
+                                                }}
+                                                icon={user.subscription_status == "active" ? faCheck : faXmark}
+                                             />
+                                          </Button>
+                                          <Button
+                                             style={{
+                                                width: "40px",
+                                                marginLeft: "8px",
+                                             }}
+                                             onClick={() => handleUserInfoModal(user.name)}
+                                             variant="dark"
+                                          >
+                                             <FontAwesomeIcon
+                                                style={{
+                                                   fontSize: "115%",
+                                                }}
+                                                icon={faInfo}
+                                             />
+                                          </Button>
+                                       </div>
+                                    </div>
+                                 ))}
+                                 {pageNumbers.length > 1 && (
+                                    <Pagination style={{
+                                       display: "flex",
+                                       justifyContent: "center"
+                                    }}>
+                                       <Pagination.Prev
+                                          onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+                                       />
+                                       {pageNumbers.map((number) => (
+                                          <Pagination.Item
+                                             key={number}
+                                             active={number === currentPage}
+                                             onClick={() => paginate(number)}
+                                          >
+                                             {number}
+                                          </Pagination.Item>
+                                       ))}
+                                       <Pagination.Next
+                                          onClick={() =>
+                                             currentPage < pageNumbers.length && setCurrentPage(currentPage + 1)
+                                          }
+                                       />
+                                    </Pagination>
+                                 )}
+                              </>
+                           )}
+                        </div>
                      </div>
+                  </div>
+                  <div style={{
+                     width: "100%"
+                  }}>
+                     <GoogleChart data={analytics} />
                   </div>
                </div>
             ) : (
                <p style={{ color: "rgba(255, 255, 255, 0.55)", textAlign: "center" }}>
                   <FontAwesomeIcon icon={faFaceFrown} /> You must be logged in as admin to use this.
                </p>
+            )}
+            {selectedUsername && (
+               <UserInfoModal username={selectedUsername} showModal={showUserModal} handleClose={handleCloseUserModal} />
             )}
          </PageContainer>
       </PageWrapper>

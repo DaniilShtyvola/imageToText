@@ -1,0 +1,11 @@
+rect {
+    fill: rgb(23, 25, 27);
+}
+
+text {
+    fill: rgba(255, 255, 255, 0.55)
+}
+
+g g g rect {
+    fill: rgb(33, 37, 41)
+}

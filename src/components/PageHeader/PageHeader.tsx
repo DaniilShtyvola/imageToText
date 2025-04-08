@@ -11,8 +11,6 @@ import { faRightToBracket, faRightFromBracket, faImage, faScrewdriverWrench } fr
 import { Container, Navbar, Nav, Dropdown } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 interface PageHeaderProps {}
 
 const PageHeader: FC<PageHeaderProps> = () => {
@@ -20,7 +18,7 @@ const PageHeader: FC<PageHeaderProps> = () => {
    const [isAdmin, setIsAdmin] = useState<boolean>(false);
    const navigate = useNavigate();
 
-   useEffect(() => {
+   const handleLoginUpdate = () => {
       const token = localStorage.getItem("token");
 
       if (!token) {
@@ -46,23 +44,6 @@ const PageHeader: FC<PageHeaderProps> = () => {
          console.error("Error decoding token:", error);
          setIsAdmin(false);
          setNickname(null);
-      }
-   }, []);
-
-   const handleLoginUpdate = () => {
-      const token = localStorage.getItem("token");
-
-      if (token) {
-         try {
-            const decoded: any = jwtDecode(token);
-            const username = decoded.sub;
-
-            if (username) {
-               setNickname(username);
-            }
-         } catch (error) {
-            console.error("Error decoding token: ", error);
-         }
       }
    };
 
