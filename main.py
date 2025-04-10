@@ -41,6 +41,12 @@ class User(Base):
     blocked_by = Column(String, nullable=True)  
     blocked_at = Column(DateTime, nullable=True)
 
+class UserLoginLog(Base):
+    __tablename__ = "user_login_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    login_time = Column(DateTime, default=datetime.utcnow)
+
 Base.metadata.create_all(bind=engine)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -92,9 +98,13 @@ def count_user_activity_in_last_30_days(user: User, db: Session):
 
 def update_activity_count(user: User, db: Session):
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    login_count = db.query(User).filter(User.id == user.id, User.last_login > thirty_days_ago).count()
-    user.activity_count_last_30_days = login_count
+    count = db.query(UserLoginLog).filter(
+        UserLoginLog.user_id == user.id,
+        UserLoginLog.login_time > thirty_days_ago
+    ).count()
+    user.activity_count_last_30_days = count
     db.commit()
+
 
 class UserResponse(BaseModel):
     name: str
@@ -149,6 +159,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         user.session_duration = (now - user.last_login).total_seconds()
 
     user.last_login = now
+    db.add(UserLoginLog(user_id=user.id))
     db.commit()
 
     update_activity_count(user, db)
@@ -246,6 +257,24 @@ async def get_blocked_users(current_user: User = Depends(get_current_user), db: 
         }
         for user in blocked_users
     ]
+
+@app.get("/registrations_last_30_days")
+async def registrations_last_30_days(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied. Only admin can access this data.")
+    
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    registrations = db.query(User).filter(User.registered_at > thirty_days_ago).count()
+    return {"registrations_last_30_days": registrations}
+
+@app.get("/blocked_users_last_30_days")
+async def blocked_users_last_30_days(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied. Only admin can access this data.")
+    
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    blocked_users = db.query(User).filter(User.is_blocked == 1, User.blocked_at > thirty_days_ago).count()
+    return {"blocked_users_last_30_days": blocked_users}
 
 @app.put("/update_subscription/{username}")
 async def update_subscription(username: str, update_data: SubscriptionUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
