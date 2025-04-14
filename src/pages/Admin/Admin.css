@@ -1,25 +1,25 @@
 .FormPlaceholder::placeholder {
-   color: rgba(255, 255, 255, 0.543);
+  color: rgba(255, 255, 255, 0.543);
 }
 
 .pagination {
-   border: rgb(23, 25, 27) 2px solid;
-   color: white;
+  border: rgb(23, 25, 27) 2px solid;
+  color: white;
 }
 
 .pagination .page-link:hover {
-   background-color: rgb(33, 37, 41);
-   color: white;
+  background-color: rgb(33, 37, 41);
+  color: white;
 }
 
 .pagination .page-link {
-   background-color: rgb(27, 31, 35);
-   color: white;
-   border: rgb(23, 25, 27) 2px solid;
+  background-color: rgb(27, 31, 35);
+  color: white;
+  border: rgb(23, 25, 27) 2px solid;
 }
 
 .active > .page-link {
-   background-color: rgb(33, 37, 41);
-   color: white;
-   border: rgb(23, 25, 27) 2px solid;
+  background-color: rgb(33, 37, 41);
+  color: white;
+  border: rgb(23, 25, 27) 2px solid;
 }

@@ -8,16 +8,16 @@ import Main from "./pages/Main/Main.tsx";
 import Admin from "./pages/Admin/Admin.tsx";
 
 createRoot(document.getElementById("root")!).render(
-   <StrictMode>
-      <BrowserRouter>
-         <Header />
-         <main>
-            <Routes>
-               <Route path='/' element={<Main />} />
-               <Route path='/login' element={<Auth />} />
-               <Route path='/admin' element={<Admin />} />
-            </Routes>
-         </main>
-      </BrowserRouter>
-   </StrictMode>,
+  <StrictMode>
+    <BrowserRouter>
+      <Header />
+      <main>
+        <Routes>
+          <Route path='/' element={<Main />} />
+          <Route path='/login' element={<Auth />} />
+          <Route path='/admin' element={<Admin />} />
+        </Routes>
+      </main>
+    </BrowserRouter>
+  </StrictMode>,
 );

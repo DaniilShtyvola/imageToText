@@ -12,22 +12,24 @@ import {
   faFaceFrown,
   faUser,
   faUserTie,
-  faCheck,
-  faXmark,
   faMagnifyingGlass,
   faInfo,
+  faLock,
+  faUnlock,
+  faFaceSadTear,
+  faFaceLaugh,
 } from "@fortawesome/free-solid-svg-icons";
 
-import UserInfoModal from "../../components/UserInfoModal/UserInfoModal.tsx";
+import UserAnalyticsModal from "../../components/UserAnalyticsModal/UserAnalyticsModal.tsx";
+import UserStatusModal from "../../components/UserStatusModal/UserStatusModal.tsx";
 import GoogleChart from "../../components/GoogleChart/GoogleChart.tsx";
-
-const API_URL = "http://127.0.0.1:8000";
 
 interface User {
   name: string;
   password: string;
   role: string;
   subscription_status: string;
+  is_blocked: boolean;
 }
 
 interface UserAnalytics {
@@ -42,13 +44,20 @@ const Admin: FC = () => {
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [users, setUsers] = useState<User[]>([]);
-  const [analytics, setAnalytics] = useState<UserAnalytics[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
+
   const [currentPage, setCurrentPage] = useState(1);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
   const usersPerPage = 6;
+
+  const [analytics, setAnalytics] = useState<UserAnalytics[]>([]);
+
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showBlockedUserModal, setShowBlockedUserModal] = useState(false);
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+
+  const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -61,24 +70,24 @@ const Admin: FC = () => {
     return () => window.removeEventListener("loggedOut", handleLogOutUpdate);
   }, []);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`${API_URL}/users`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        const data = await response.json();
-        setUsers(data);
-      } catch (error) {
-        setErrorMessage("Failed to load users.");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/users`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      setErrorMessage("Failed to load users.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         const response = await fetch(`${API_URL}/analytics`, {
@@ -97,6 +106,14 @@ const Admin: FC = () => {
     fetchAnalytics();
   }, []);
 
+  useEffect(() => {
+    window.addEventListener("blockedUserEvent", fetchUsers);
+
+    return () => {
+      window.removeEventListener("blockedUserEvent", fetchUsers);
+    };
+  }, []);
+
   const handleSubscriptionUpdate = async (username: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
@@ -109,27 +126,20 @@ const Admin: FC = () => {
         body: JSON.stringify({ subscription_status: newStatus }),
       });
       setUsers((prev) =>
-        prev.map((user) =>
-          user.name === username ? { ...user, subscription_status: newStatus } : user
-        )
+        prev.map((user) => (user.name === username ? { ...user, subscription_status: newStatus } : user)),
       );
     } catch {
       setErrorMessage("Failed to update subscription status.");
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter((user) => user.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
-  const pageNumbers = Array.from(
-    { length: Math.ceil(filteredUsers.length / usersPerPage) },
-    (_, i) => i + 1
-  );
+  const pageNumbers = Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => i + 1);
 
   return (
     <PageWrapper>
@@ -137,20 +147,49 @@ const Admin: FC = () => {
         {isLoggedIn ? (
           <div style={{ width: "100%", display: "flex", gap: "18px" }}>
             <div style={{ width: "100%" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <Form.Control
-                  className="FormPlaceholder"
-                  type="text"
-                  placeholder="Enter username"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ minWidth: "200px", backgroundColor: "#212529", color: "white" }}
-                />
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <FontAwesomeIcon
+                    style={{
+                      fontSize: "140%",
+                      color: "rgb(33, 37, 41)",
+                      marginRight: "12px",
+                    }}
+                    icon={faMagnifyingGlass}
+                  />
+                  <Form.Control
+                    className='FormPlaceholder'
+                    type='text'
+                    id='inputUserName'
+                    placeholder='Enter username'
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{
+                      width: "auto",
+                      minWidth: "200px",
+                      backgroundColor: "rgb(33, 37, 41)",
+                      border: "1px solid rgb(33, 37, 41)",
+                      color: "white",
+                      display: "inline-block",
+                    }}
+                  />
+                </div>
               </div>
               {loading ? (
-                <Spinner animation="border" />
+                <Spinner animation='border' />
               ) : errorMessage ? (
-                <Alert variant="danger">{errorMessage}</Alert>
+                <Alert variant='danger'>{errorMessage}</Alert>
               ) : (
                 <>
                   {currentUsers.map((user) => (
@@ -176,25 +215,71 @@ const Admin: FC = () => {
                           <p style={{ margin: 0, fontSize: "70%", color: "#aaa" }}>{user.role}</p>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                        }}
+                      >
                         <Button
-                          variant={user.subscription_status === "active" ? "success" : "danger"}
+                          variant={user.subscription_status == "active" ? "success" : "danger"}
+                          style={{
+                            width: "40px",
+                            padding: "4px",
+                          }}
                           onClick={() => handleSubscriptionUpdate(user.name, user.subscription_status)}
                         >
-                          <FontAwesomeIcon icon={user.subscription_status === "active" ? faCheck : faXmark} />
+                          <FontAwesomeIcon
+                            style={{
+                              fontSize: "115%",
+                            }}
+                            icon={user.subscription_status == "active" ? faFaceLaugh : faFaceSadTear}
+                          />
                         </Button>
-                        <Button variant="dark" onClick={() => {
-                          setSelectedUsername(user.name);
-                          setShowUserModal(true);
-                        }}>
-                          <FontAwesomeIcon icon={faInfo} />
+                        <Button
+                          style={{
+                            width: "40px",
+                            marginLeft: "8px",
+                            padding: "4px",
+                          }}
+                          onClick={() => {
+                            setSelectedUsername(user.name);
+                            setShowBlockedUserModal(true);
+                          }}
+                          variant='dark'
+                        >
+                          <FontAwesomeIcon
+                            style={{
+                              fontSize: "115%",
+                              color: user.is_blocked ? "rgb(220, 53, 69)" : "rgb(25, 135, 84)",
+                            }}
+                            icon={user.is_blocked ? faLock : faUnlock}
+                          />
+                        </Button>
+                        <Button
+                          style={{
+                            width: "40px",
+                            marginLeft: "8px",
+                            padding: "4px",
+                          }}
+                          onClick={() => {
+                            setSelectedUsername(user.name);
+                            setShowUserModal(true);
+                          }}
+                          variant='dark'
+                        >
+                          <FontAwesomeIcon
+                            style={{
+                              fontSize: "115%",
+                            }}
+                            icon={faInfo}
+                          />
                         </Button>
                       </div>
                     </div>
                   ))}
 
                   {pageNumbers.length > 1 && (
-                    <Pagination className="justify-content-center">
+                    <Pagination className='justify-content-center'>
                       <Pagination.Prev onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} />
                       {pageNumbers.map((number) => (
                         <Pagination.Item
@@ -206,11 +291,7 @@ const Admin: FC = () => {
                         </Pagination.Item>
                       ))}
                       <Pagination.Next
-                        onClick={() =>
-                          setCurrentPage((prev) =>
-                            prev < pageNumbers.length ? prev + 1 : prev
-                          )
-                        }
+                        onClick={() => setCurrentPage((prev) => (prev < pageNumbers.length ? prev + 1 : prev))}
                       />
                     </Pagination>
                   )}
@@ -227,12 +308,22 @@ const Admin: FC = () => {
           </p>
         )}
 
-        {selectedUsername && (
-          <UserInfoModal
+        {selectedUsername && showUserModal && (
+          <UserAnalyticsModal
             username={selectedUsername}
             showModal={showUserModal}
             handleClose={() => {
               setShowUserModal(false);
+              setSelectedUsername(null);
+            }}
+          />
+        )}
+        {selectedUsername && showBlockedUserModal && (
+          <UserStatusModal
+            username={selectedUsername}
+            showModal={showBlockedUserModal}
+            handleClose={() => {
+              setShowBlockedUserModal(false);
               setSelectedUsername(null);
             }}
           />

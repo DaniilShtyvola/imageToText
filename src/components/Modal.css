@@ -1,0 +1,22 @@
+.modal-content {
+  background-color: rgb(23, 25, 27);
+  color: white;
+}
+
+.modal-content .btn-close {
+  display: none;
+}
+
+.modal-header {
+  border-bottom: rgb(33, 37, 41) 1px solid;
+}
+
+.modal-footer {
+  border-top: rgb(33, 37, 41) 1px solid;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.FormPlaceholder::placeholder {
+  color: rgba(255, 255, 255, 0.543);
+}
