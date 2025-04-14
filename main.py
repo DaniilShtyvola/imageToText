@@ -111,12 +111,17 @@ class UserResponse(BaseModel):
     password: str
     role: str
     subscription_status: str
-    block_reason: Optional[str] = None 
-    blocked_by: Optional[str] = None 
-    blocked_at: Optional[datetime] = None
+    is_blocked: int
 
     class Config:
         orm_mode = True
+
+class BlockedUserResponse(BaseModel):
+    username: str
+    is_blocked: int
+    block_reason: Optional[str]
+    blocked_by: Optional[str]
+    blocked_at: Optional[datetime]
 
 class UserCreate(BaseModel):
     name: str
@@ -202,7 +207,13 @@ async def get_all_users(current_user: User = Depends(get_current_user), db: Sess
         raise HTTPException(status_code=403, detail="Only admin can view all users")
     users = db.query(User).all()
     return [
-        {"name": user.name, "password": user.hashed_password, "role": user.role, "subscription_status": user.subscription_status}
+        {
+            "name": user.name, 
+            "password": user.hashed_password, 
+            "role": user.role, 
+            "subscription_status": user.subscription_status,
+            "is_blocked": user.is_blocked
+        }
         for user in users
     ]
 
@@ -239,24 +250,22 @@ def get_user_analytics(username: str, current_user: User = Depends(get_current_u
         "activity_last_30_days": target_user.activity_count_last_30_days
     }
 
-@app.get("/blocked_users", response_model=list[UserResponse])
-async def get_blocked_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+@app.get("/blocked_user/{username}", response_model=BlockedUserResponse)
+async def get_blocked_user(username: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can view blocked users")
-    
-    blocked_users = db.query(User).filter(User.is_blocked == 1).all() 
-    return [
-        {
-            "name": user.name,
-            "password": user.hashed_password,
-            "role": user.role,
-            "subscription_status": user.subscription_status,
-            "block_reason": user.block_reason,
-            "blocked_by": user.blocked_by,
-            "blocked_at": user.blocked_at
-        }
-        for user in blocked_users
-    ]
+
+    user = get_user(db, username)
+    if not user :
+        raise HTTPException(status_code=404, detail="Blocked user not found")
+
+    return {
+        "username": user.name,
+        "is_blocked": user.is_blocked,
+        "block_reason": user.block_reason,
+        "blocked_by": user.blocked_by,
+        "blocked_at": user.blocked_at,
+    }
 
 @app.get("/registrations_last_30_days")
 async def registrations_last_30_days(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
