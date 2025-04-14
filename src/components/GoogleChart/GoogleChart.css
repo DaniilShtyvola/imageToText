@@ -9,3 +9,25 @@ text {
 g g g rect {
   fill: rgb(33, 37, 41);
 }
+
+.google-visualization-tooltip {
+  background-color: rgb(33, 37, 41) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+  position: absolute !important;
+  transform: translate(-30%, 40%);
+  z-index: 9999;
+}
+
+.google-visualization-tooltip div {
+  font-size: 12px;
+  padding: 4px 8px;
+  font-weight: normal;
+  text-align: center;
+}
+
+.google-visualization-tooltip strong {
+  font-weight: 600;
+}

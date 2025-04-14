@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
+import "../Modal.css";
+
 import { Modal } from "react-bootstrap";
 
 import { faCalendarPlus, faCalendarDay, faUser, faClock, faChartLine } from "@fortawesome/free-solid-svg-icons";
 
 import ModalInfoField from "../ModalInfoField/ModalInfoField";
-import "../Modal.css";
 
 type UserAnalytics = {
   username: string;

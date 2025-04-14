@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import "../Modal.css";
+
 import { Modal, Button, Form } from "react-bootstrap";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -13,7 +15,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import ModalInfoField from "../ModalInfoField/ModalInfoField";
-import "../Modal.css";
 
 type User = {
   username: string;

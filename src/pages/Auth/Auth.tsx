@@ -1,14 +1,14 @@
 import React, { FC, useState, useEffect } from "react";
 import { PageWrapper, PageContainer } from "../Page.styled.ts";
-import "./Auth.css";
+import "../Page.css";
 
 import { Form, Button, Alert } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-import { FontAwesomeIcon, FontAwesomeIconProps } from "@fortawesome/react-fontawesome";
-import { faFaceSadTear, faFaceLaugh, faLaugh } from "@fortawesome/free-solid-svg-icons";
-
 import axios from "axios";
+
+import { FontAwesomeIcon, FontAwesomeIconProps } from "@fortawesome/react-fontawesome";
+import { faFaceSadTear, faFaceLaugh } from "@fortawesome/free-solid-svg-icons";
 
 const AuthPage: FC = () => {
   const [isLogin, setIsLogin] = useState(true);

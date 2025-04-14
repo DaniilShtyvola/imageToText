@@ -1,6 +1,6 @@
 import { FC, useState, useEffect } from "react";
 import { PageWrapper, PageContainer } from "../Page.styled.ts";
-import "./Admin.css";
+import "../Page.css";
 
 import { Spinner, Alert, Button, Form, Pagination } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -102,8 +102,12 @@ const Admin: FC = () => {
       }
     };
 
-    fetchUsers();
-    fetchAnalytics();
+    const fetchData = async () => {
+      await fetchUsers();
+      await fetchAnalytics();
+    };
+  
+    fetchData();
   }, []);
 
   useEffect(() => {

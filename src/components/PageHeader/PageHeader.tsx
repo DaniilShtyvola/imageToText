@@ -2,14 +2,14 @@ import { FC, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { PageHeaderWrapper, HeaderContainer } from "./PageHeader.styled.ts";
 
+import { Container, Navbar, Nav, Dropdown } from "react-bootstrap";
+import "bootstrap/dist/css/bootstrap.min.css";
+
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRightToBracket, faRightFromBracket, faImage, faScrewdriverWrench } from "@fortawesome/free-solid-svg-icons";
-
-import { Container, Navbar, Nav, Dropdown } from "react-bootstrap";
-import "bootstrap/dist/css/bootstrap.min.css";
 
 interface PageHeaderProps {}
 

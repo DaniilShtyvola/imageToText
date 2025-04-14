@@ -41,22 +41,28 @@ const GoogleChart: React.FC<Props> = ({ data }) => {
       const chartData = new window.google.visualization.DataTable();
       chartData.addColumn("number", "Activity Count");
       chartData.addColumn("number", "Session Duration");
-      chartData.addColumn({ type: "string", role: "tooltip" });
+      chartData.addColumn({ type: "string", role: "tooltip", p: { html: true } });
 
       const rows = data
         .filter((user) => user.session_duration !== null)
-        .map((user) => [user.activity_last_30_days, user.session_duration, user.username]);
+        .map((user) => [
+          user.activity_last_30_days,
+          user.session_duration,
+          `<div>
+             <strong>${user.username}</strong>
+           </div>`,
+        ]);
 
       chartData.addRows(rows);
 
       const options = {
         title: "Activity vs Session Duration",
         hAxis: { title: "Activity Count (Last 30 Days)" },
-        vAxis: { title: "Session Duration (hours)" },
+        vAxis: { title: "Session Duration (seconds)" },
         legend: "none",
         tooltip: { isHtml: true },
         pointSize: 8,
-        colors: ["#3366CC"],
+        colors: ["rgb(25, 135, 84)"],
       };
 
       const chart = new window.google.visualization.ScatterChart(chartRef.current);
