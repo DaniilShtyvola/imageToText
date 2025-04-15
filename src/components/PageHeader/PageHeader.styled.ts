@@ -16,7 +16,6 @@ export const HeaderContainer = styled.div`
   align-items: center;
 
   svg {
-    margin-left: 18px;
     font-size: 90%;
   }
 `;

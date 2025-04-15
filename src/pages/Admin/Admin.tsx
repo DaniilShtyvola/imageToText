@@ -106,7 +106,7 @@ const Admin: FC = () => {
       await fetchUsers();
       await fetchAnalytics();
     };
-  
+
     fetchData();
   }, []);
 

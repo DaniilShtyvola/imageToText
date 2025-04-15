@@ -9,7 +9,16 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRightToBracket, faRightFromBracket, faImage, faScrewdriverWrench } from "@fortawesome/free-solid-svg-icons";
+import {
+  faRightToBracket,
+  faRightFromBracket,
+  faImage,
+  faScrewdriverWrench,
+  faMessage,
+  faLanguage,
+  faFont,
+  faStarHalfStroke,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface PageHeaderProps {}
 
@@ -69,10 +78,46 @@ const PageHeader: FC<PageHeaderProps> = () => {
       <HeaderContainer>
         <Navbar bg='dark' data-bs-theme='dark' style={{ width: "100%", borderRadius: "12px" }}>
           <Container>
-            <Navbar.Brand style={{ cursor: "pointer" }}>
-              <Nav.Link as={Link} to='/' style={{ paddingRight: "22px" }}>
-                <FontAwesomeIcon icon={faImage} /> Image to Text
-              </Nav.Link>
+            <Navbar.Brand style={{ userSelect: "none" }}>
+              <span
+                style={{
+                  position: "relative",
+                  top: "0px",
+                  fontWeight: "700",
+                  marginRight: "2px",
+                }}
+              >
+                OCR
+              </span>
+              <FontAwesomeIcon
+                style={{
+                  fontSize: "110%",
+                }}
+                icon={faImage}
+              />
+              <FontAwesomeIcon
+                icon={faMessage}
+                style={{
+                  fontSize: "80%",
+                  position: "relative",
+                  top: "-10px",
+                  left: "-4px",
+                  backgroundColor: "rgb(33, 37, 41)",
+                  paddingLeft: "3px",
+                  borderRadius: "6px",
+                }}
+              />
+              <FontAwesomeIcon
+                icon={faFont}
+                style={{
+                  fontSize: "60%",
+                  position: "relative",
+                  top: "-13px",
+                  left: "-17px",
+                  color: "rgb(33, 37, 41)",
+                  borderRadius: "6px",
+                }}
+              />
             </Navbar.Brand>
             <Nav className='me-auto'>
               {!nickname && (
@@ -80,10 +125,24 @@ const PageHeader: FC<PageHeaderProps> = () => {
                   <FontAwesomeIcon icon={faRightToBracket} /> Log in
                 </Nav.Link>
               )}
-              {isAdmin && nickname && (
-                <Nav.Link as={Link} to='/admin' style={{ paddingRight: "22px" }}>
-                  <FontAwesomeIcon icon={faScrewdriverWrench} /> Admin Panel
-                </Nav.Link>
+              {nickname && (
+                <>
+                  <Nav.Link as={Link} to='/image-to-text' style={{ paddingRight: "32px" }}>
+                    <FontAwesomeIcon icon={faImage} /> Image to Text
+                  </Nav.Link>
+                  <Nav.Link as={Link} to='/translate-text' style={{ paddingRight: "32px" }}>
+                    <FontAwesomeIcon icon={faLanguage} /> Translate Text
+                  </Nav.Link>
+                  <Nav.Link as={Link} to='/rate-the-review' style={{ paddingRight: "32px" }}>
+                    <FontAwesomeIcon icon={faStarHalfStroke} style={{ position: "relative", top: "-1px" }} /> Rate the
+                    Review
+                  </Nav.Link>
+                  {isAdmin && (
+                    <Nav.Link as={Link} to='/admin' style={{ paddingRight: "22px" }}>
+                      <FontAwesomeIcon icon={faScrewdriverWrench} /> Admin Panel
+                    </Nav.Link>
+                  )}
+                </>
               )}
             </Nav>
             {nickname && (

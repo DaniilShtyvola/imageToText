@@ -7,7 +7,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFaceFrown, faShareFromSquare, faComment, faQuestion } from "@fortawesome/free-solid-svg-icons";
 
-const Main: FC = () => {
+const ImageToText: FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -101,7 +101,7 @@ const Main: FC = () => {
       const AI_API_URL = import.meta.env.VITE_AI_API_URL;
       const base64Image = image.split(",")[1];
 
-      const fullUrl = `${AI_API_URL}/ocr/base64/detailed`;
+      const fullUrl = `${AI_API_URL}/ocr/base64/enhanced`;
       console.log("Send image to:", fullUrl);
 
       const response = await fetch(fullUrl, {
@@ -147,7 +147,14 @@ const Main: FC = () => {
                 marginBottom: "1rem",
               }}
             >
-              <p style={{ color: "rgba(255, 255, 255, 0.55)", margin: 0 }}>Selected image:</p>
+              <p
+                style={{
+                  color: "rgba(255, 255, 255, 0.55)",
+                  margin: 0,
+                }}
+              >
+                Select image to recognize text
+              </p>
               <Button variant='success' disabled={image == null || loading} onClick={handleSendImage}>
                 <FontAwesomeIcon icon={faShareFromSquare} style={{ marginRight: "6px" }} />
                 Send image
@@ -202,7 +209,7 @@ const Main: FC = () => {
                 <Spinner animation='border' style={{ color: "white" }} />
               </div>
             )}
-            {ocrResult && !loading && (
+            {!loading && ocrResult && (
               <div
                 style={{
                   color: "white",
@@ -214,14 +221,14 @@ const Main: FC = () => {
                 }}
               >
                 <FontAwesomeIcon
-                  icon={ocrResult === "Текст не обнаружен на изображении" ? faQuestion : faComment}
+                  icon={ocrResult === "" ? faQuestion : faComment}
                   style={{
                     marginRight: "6px",
                     color: "rgba(255, 255, 255, 0.55)",
                     fontSize: "150%",
                   }}
                 />
-                <p style={{ marginBottom: 0 }}>{ocrResult}</p>
+                <p style={{ marginBottom: 0 }}>{ocrResult ? ocrResult : "No text found"}</p>
               </div>
             )}
           </div>
@@ -252,4 +259,4 @@ const Main: FC = () => {
   );
 };
 
-export default Main;
+export default ImageToText;
