@@ -1,11 +1,15 @@
 import { FC, useState, useEffect, useRef } from "react";
 import { PageWrapper, PageContainer } from "../Page.styled.ts";
+import "../Page.css";
 
-import { Spinner, Button, Image, Alert, Modal } from "react-bootstrap";
+import { Spinner, Button, Image, Alert, Modal, Dropdown } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFaceFrown, faShareFromSquare, faMessage, faQuestion, faLanguage } from "@fortawesome/free-solid-svg-icons";
+
+import './TranslateText.css';
+import languages from './languages.json';
 
 const TranslateText: FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -110,7 +114,7 @@ const TranslateText: FC = () => {
           filename: "image.png",
         },
         translation_request: {
-          target_language: "uk",
+          target_language: selectedLanguage.code,
         },
       };
 
@@ -139,6 +143,8 @@ const TranslateText: FC = () => {
     window.open("https://bank.gov.ua/ua/about/support-the-armed-forces", "_blank");
   };
 
+  const [selectedLanguage, setSelectedLanguage] = useState({ label: "English", code: "en" });
+
   return (
     <PageWrapper>
       <PageContainer>
@@ -157,14 +163,46 @@ const TranslateText: FC = () => {
                 marginBottom: "1rem",
               }}
             >
-              <p
-                style={{
-                  color: "rgba(255, 255, 255, 0.55)",
+              <div style={{
+                display: "flex",
+                alignItems: "center"
+              }}>
+                <p style={{
                   margin: 0,
-                }}
-              >
-                Select image to translate
-              </p>
+                  marginRight: "4px",
+                  color: "rgb(102, 106, 109)"
+                }}>Translate to: </p>
+                <Dropdown>
+                  <Dropdown.Toggle
+                    variant="primary"
+                    id="dropdown-basic"
+                    style={{
+                      backgroundColor: "rgb(27, 31, 35)",
+                      border: 0
+                    }}
+                  >
+                    {selectedLanguage.label}
+                  </Dropdown.Toggle>
+
+                  <Dropdown.Menu
+                    style={{
+                      maxHeight: "300px",
+                      overflowY: "auto",
+                      backgroundColor: "rgb(27, 31, 35)"
+                    }}
+                  >
+                    {languages.map((lang) => (
+                      <Dropdown.Item
+                        key={lang.code}
+                        onClick={() => setSelectedLanguage(lang)}
+                        active={selectedLanguage.code === lang.code}
+                      >
+                        {lang.label}
+                      </Dropdown.Item>
+                    ))}
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
               <Button variant='success' disabled={image == null || loading} onClick={handleSendImage}>
                 <FontAwesomeIcon icon={faShareFromSquare} style={{ marginRight: "6px" }} />
                 Send image
@@ -196,7 +234,7 @@ const TranslateText: FC = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "rgba(255, 255, 255, 0.55)",
+                    color: "rgb(102, 106, 109)",
                     border: "1px solid rgb(33, 37, 41)",
                     cursor: "pointer",
                     fontSize: "120%",
@@ -234,7 +272,7 @@ const TranslateText: FC = () => {
                   icon={ocrResult === "" ? faQuestion : faLanguage}
                   style={{
                     marginRight: "8px",
-                    color: "rgba(255, 255, 255, 0.55)",
+                    color: "rgb(102, 106, 109)",
                     fontSize: "150%",
                   }}
                 />
@@ -243,7 +281,7 @@ const TranslateText: FC = () => {
             )}
           </div>
         ) : (
-          <p style={{ color: "rgba(255, 255, 255, 0.55)", textAlign: "center" }}>
+          <p style={{ color: "rgb(102, 106, 109)", textAlign: "center" }}>
             <FontAwesomeIcon icon={faFaceFrown} /> You must be logged in to use this.
           </p>
         )}

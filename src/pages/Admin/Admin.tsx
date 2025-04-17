@@ -18,6 +18,7 @@ import {
   faUnlock,
   faFaceSadTear,
   faFaceLaugh,
+  faFaceSadCry
 } from "@fortawesome/free-solid-svg-icons";
 
 import UserAnalyticsModal from "../../components/UserAnalyticsModal/UserAnalyticsModal.tsx";
@@ -149,53 +150,65 @@ const Admin: FC = () => {
     <PageWrapper>
       <PageContainer>
         {isLoggedIn ? (
-          <div style={{ width: "100%", display: "flex", gap: "18px" }}>
-            <div style={{ width: "100%" }}>
+          <>
+            {loading ? (
+              <Spinner style={{ marginTop: "12rem", color: "rgb(102, 106, 109)" }} animation='border' />
+            ) : errorMessage ? (
               <div
                 style={{
+                  marginTop: "12rem",
                   display: "flex",
-                  justifyContent: "space-between",
+                  justifyContent: "center",
+                  color: "rgb(102, 106, 109)",
+                  fontSize: "120%",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <FontAwesomeIcon
-                    style={{
-                      fontSize: "140%",
-                      color: "rgb(33, 37, 41)",
-                      marginRight: "12px",
-                    }}
-                    icon={faMagnifyingGlass}
-                  />
-                  <Form.Control
-                    className='FormPlaceholder'
-                    type='text'
-                    id='inputUserName'
-                    placeholder='Enter username'
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{
-                      width: "auto",
-                      minWidth: "200px",
-                      backgroundColor: "rgb(33, 37, 41)",
-                      border: "1px solid rgb(33, 37, 41)",
-                      color: "white",
-                      display: "inline-block",
-                    }}
-                  />
-                </div>
+                <p>
+                  <FontAwesomeIcon icon={faFaceSadCry} /> Failed to fetch info
+                </p>
               </div>
-              {loading ? (
-                <Spinner animation='border' />
-              ) : errorMessage ? (
-                <Alert variant='danger'>{errorMessage}</Alert>
-              ) : (
-                <>
+            ) : (
+              <div style={{ width: "100%", display: "flex", gap: "18px" }}>
+                <div style={{ width: "100%" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        marginBottom: "20px",
+                      }}
+                    >
+                      <FontAwesomeIcon
+                        style={{
+                          fontSize: "140%",
+                          color: "rgb(33, 37, 41)",
+                          marginRight: "12px",
+                        }}
+                        icon={faMagnifyingGlass}
+                      />
+                      <Form.Control
+                        className='FormPlaceholder'
+                        type='text'
+                        id='inputUserName'
+                        placeholder='Enter username'
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{
+                          width: "auto",
+                          minWidth: "200px",
+                          backgroundColor: "rgb(33, 37, 41)",
+                          border: "1px solid rgb(33, 37, 41)",
+                          color: "white",
+                          display: "inline-block",
+                        }}
+                      />
+                    </div>
+                  </div>
                   {currentUsers.map((user) => (
                     <div
                       key={user.name}
@@ -212,11 +225,23 @@ const Admin: FC = () => {
                       <div style={{ display: "flex", alignItems: "center" }}>
                         <FontAwesomeIcon
                           icon={user.role === "user" ? faUser : faUserTie}
-                          style={{ fontSize: "185%", marginRight: "12px", color: "#ccc" }}
+                          style={{
+                            fontSize: "185%",
+                            marginRight: "12px",
+                            color: "rgb(102, 106, 109)"
+                          }}
                         />
                         <div>
                           <p style={{ margin: 0 }}>{user.name}</p>
-                          <p style={{ margin: 0, fontSize: "70%", color: "#aaa" }}>{user.role}</p>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "70%",
+                              color: "rgb(102, 106, 109)",
+                              position: "relative",
+                              top: "-2px"
+                            }}
+                          >{user.role}</p>
                         </div>
                       </div>
                       <div
@@ -299,13 +324,29 @@ const Admin: FC = () => {
                       />
                     </Pagination>
                   )}
-                </>
-              )}
-            </div>
-            <div style={{ width: "100%" }}>
-              <GoogleChart data={analytics} />
-            </div>
-          </div>
+                </div>
+                <div style={{ width: "100%" }}>
+                  {analytics.length > 0 ? (
+                    <GoogleChart data={analytics} />
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: "12rem",
+                        display: "flex",
+                        justifyContent: "center",
+                        color: "rgb(102, 106, 109)",
+                        fontSize: "120%",
+                      }}
+                    >
+                      <p>
+                        <FontAwesomeIcon icon={faFaceFrown} /> Failed to load analytics
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <p style={{ color: "#aaa", textAlign: "center" }}>
             <FontAwesomeIcon icon={faFaceFrown} /> You must be logged in as admin to use this.

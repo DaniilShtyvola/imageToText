@@ -1,0 +1,40 @@
+.dropdown-menu::-webkit-scrollbar {
+    width: 8px;
+}
+
+.dropdown-menu::-webkit-scrollbar-track {
+    background: rgb(27, 31, 35);
+    border-radius: 4px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+    background: rgb(42, 48, 53);
+    border-radius: 4px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb:hover {
+    background: rgb(42, 48, 53);
+}
+
+.dropdown-menu {
+    background-color: rgb(27, 31, 35);
+}
+
+.dropdown-item {
+    color: rgb(74, 79, 83);
+}
+
+.dropdown-item:hover {
+    color: white;
+}
+
+.dropdown-menu .dropdown-item:hover {
+    background-color: rgb(42, 48, 53);
+    color: rgb(172, 174, 176);
+}
+
+.dropdown-menu .dropdown-item.active,
+.dropdown-menu .dropdown-item:active {
+    background-color: rgb(42, 48, 53);
+    color: white;
+}
