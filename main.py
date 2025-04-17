@@ -1,4 +1,3 @@
-
 import os
 import jwt
 import secrets
@@ -6,12 +5,14 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, JSON
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import Optional, List
+import logging
+from sqlalchemy.ext.mutable import MutableList
 
 
 load_dotenv()
@@ -25,6 +26,13 @@ Base = declarative_base()
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+SUBSCRIPTION_LIMITS = {
+    "Standard": 10,
+    "Premium": 50,
+    "Gold": 100,
+    "inactive": 0
+}
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -36,10 +44,14 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
     session_duration = Column(Float, nullable=True)
     activity_count_last_30_days = Column(Integer, default=0)
-    is_blocked = Column(Integer, default=0) 
+    is_blocked = Column(Integer, default=0)
     block_reason = Column(String, nullable=True)
-    blocked_by = Column(String, nullable=True)  
+    blocked_by = Column(String, nullable=True)
     blocked_at = Column(DateTime, nullable=True)
+    sessions = Column(MutableList.as_mutable(JSON), default=list)
+    subscription_start = Column(Float, nullable=True)  
+    subscription_end = Column(Float, nullable=True)    
+    amount_of_requests = Column(Integer, default=0)
 
 class UserLoginLog(Base):
     __tablename__ = "user_login_logs"
@@ -105,13 +117,59 @@ def update_activity_count(user: User, db: Session):
     user.activity_count_last_30_days = count
     db.commit()
 
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid")
+        
+        user = db.query(User).filter(User.name == username).first()
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        return user
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid")
 
+logging.basicConfig(level=logging.DEBUG)
+
+def start_session(user: User, db: Session):
+    now = datetime.utcnow().timestamp()
+    session_data = {
+        "start_time": now,
+        "image_requests_count": 0,
+        "max_requests": SUBSCRIPTION_LIMITS.get(user.subscription_status, 0)  
+    }
+
+    logging.debug(f"Session data to be added: {session_data}")
+    
+    user.sessions.append(session_data)
+
+    logging.debug(f"User sessions before commit: {user.sessions}")
+    
+    db.commit()
+    db.refresh(user)
+
+    logging.debug(f"User sessions after commit: {user.sessions}")
+
+
+def end_session(user: User, db: Session):
+    now = datetime.utcnow().timestamp()
+    if user.sessions:
+        last_session = user.sessions[-1]
+        session_duration = now - last_session["start_time"]
+        last_session["end_time"] = now
+        last_session["session_duration"] = session_duration
+        db.commit()
+    else:
+        raise HTTPException(status_code=400, detail="No active session found")
+        
 class UserResponse(BaseModel):
     name: str
-    password: str
     role: str
     subscription_status: str
     is_blocked: int
+    sessions: List[dict]
 
     class Config:
         orm_mode = True
@@ -169,26 +227,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
     update_activity_count(user, db)
 
+    start_session(user, db)
+
     access_token = create_access_token(data={"sub": user.name, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        name: str = payload.get("sub")
-        role: str = payload.get("role")
-        if name is None or role is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        user = get_user(db, name)
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        if user.is_blocked:
-            raise HTTPException(status_code=403, detail="User is blocked")
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 @app.get("/users/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
@@ -201,7 +243,46 @@ async def get_subscription_status(username: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return {"username": user.name, "subscription_status": user.subscription_status}
 
-@app.get("/users", response_model=list[UserResponse])
+@app.put("/end_session/{username}")
+async def end_session_route(username: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.name != username:
+        raise HTTPException(status_code=403, detail="You can only end your own session or act as an admin")
+
+    user = get_user(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    end_session(user, db)
+
+    return {"message": f"Session for {username} has been ended"}
+
+@app.put("/update_subscription/{username}")
+async def update_subscription(
+    username: str,
+    update_data: SubscriptionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can update subscriptions")
+
+    user = get_user(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    now = datetime.utcnow().timestamp()
+    end = (datetime.utcnow() + timedelta(days=30)).timestamp()
+    level = update_data.subscription_status
+
+    user.subscription_status = level
+    user.subscription_start = now  
+    user.subscription_end = end  
+    user.amount_of_requests = SUBSCRIPTION_LIMITS.get(level, 0) 
+
+    db.commit()
+    return {"message": f"Subscription updated to {level} with {user.amount_of_requests} requests"}
+
+@app.get("/users", response_model=List[UserResponse])
 async def get_all_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can view all users")
@@ -209,13 +290,40 @@ async def get_all_users(current_user: User = Depends(get_current_user), db: Sess
     return [
         {
             "name": user.name, 
-            "password": user.hashed_password, 
             "role": user.role, 
             "subscription_status": user.subscription_status,
-            "is_blocked": user.is_blocked
+            "is_blocked": user.is_blocked,
+            "sessions": user.sessions
         }
         for user in users
     ]
+
+@app.get("/can_send_image")
+async def can_send_image(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    now = datetime.utcnow().timestamp()
+
+    if current_user.subscription_end is None or now > current_user.subscription_end:
+        return {"can_send": False, "reason": "Subscription expired"}
+
+    if current_user.amount_of_requests <= 0:
+        return {"can_send": False, "reason": "No requests left"}
+
+    return {"can_send": True, "requests_left": current_user.amount_of_requests}
+
+@app.post("/upload_image")
+async def upload_image(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    now = datetime.utcnow().timestamp()
+    
+    if current_user.subscription_end is None or now > current_user.subscription_end:
+        raise HTTPException(status_code=400, detail="Subscription expired")
+
+    if current_user.amount_of_requests <= 0:
+        raise HTTPException(status_code=400, detail="No requests left")
+
+    current_user.amount_of_requests -= 1
+    db.commit()
+
+    return {"message": "Image uploaded successfully", "remaining_requests": current_user.amount_of_requests}
 
 @app.get("/analytics")
 def get_analytics(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -266,7 +374,7 @@ async def get_blocked_user(username: str, current_user: User = Depends(get_curre
         "blocked_by": user.blocked_by,
         "blocked_at": user.blocked_at,
     }
-
+    
 @app.get("/registrations_last_30_days")
 async def registrations_last_30_days(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
@@ -285,17 +393,6 @@ async def blocked_users_last_30_days(db: Session = Depends(get_db), current_user
     blocked_users = db.query(User).filter(User.is_blocked == 1, User.blocked_at > thirty_days_ago).count()
     return {"blocked_users_last_30_days": blocked_users}
 
-@app.put("/update_subscription/{username}")
-async def update_subscription(username: str, update_data: SubscriptionUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can update subscriptions")
-    user = get_user(db, username)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.subscription_status = update_data.subscription_status
-    db.commit()
-    return {"message": f"Subscription status updated to {update_data.subscription_status}"}
-
 @app.put("/block_user/{username}")
 async def block_user(username: str, request: BlockUserRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.role != "admin":
@@ -309,9 +406,9 @@ async def block_user(username: str, request: BlockUserRequest, current_user: Use
 
     user.is_blocked = 1 if request.is_blocked else 0
     user.block_reason = request.block_reason
-    user.blocked_by = current_user.name  
-    user.blocked_at = datetime.utcnow() 
+    user.blocked_by = current_user.name
+    user.blocked_at = datetime.utcnow()
     db.commit()
 
     status_text = "blocked" if request.is_blocked else "unblocked"
-    return {"message": f"User {username} has been {status_text} by {current_user.name} with reason: {request.block_reason if request.block_reason else 'No reason provided'}"}
+    return {"message": f"User {username} has been {status_text} by {current_user.name} with reason: {request.block_reason if request.block_reason else 'No reason provided'}."}
